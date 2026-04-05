@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAutoSave } from "./hooks/useAutoSave";
 
 const HOLES = 18;
 const GOLD = "#c8a96e";
@@ -23,12 +24,7 @@ function getRotateTeams(h: number, indices: number[]): [number[], number[]] {
   return [[i0, i3], [i1, i2]];
 }
 
-interface Opts {
-  carry: boolean;
-  birdieReverse: boolean;
-  truncate: boolean;
-  push: boolean;
-}
+import type { Opts } from "./types";
 
 interface Result3 {
   solo: number;
@@ -191,6 +187,8 @@ export default function App() {
     return t;
   }, [results]);
 
+  useAutoSave({ mode: n, teamMode, names, pars, scores, opts, totals });
+
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
 
@@ -247,9 +245,9 @@ export default function App() {
               {TEAM_MODES.map(({ id, label }) => {
                 const active = teamMode === id;
                 let display = label;
-                if (id === "fixed_12_34") display = `固定\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
-                if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
-                if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
+                if (id === "fixed_12_34") display = "固定\n1・2\nvs\n3・4";
+                if (id === "fixed_13_24") display = "固定\n1・3\nvs\n2・4";
+                if (id === "fixed_14_23") display = "固定\n1・4\nvs\n2・3";
                 return (
                   <button key={id} onClick={() => setTeamMode(id)} style={{
                     padding: "7px 4px", borderRadius: 8,
