@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { getSessionId } from "./lib/session";
 
 const HOLES = 18;
 const GOLD = "#c8a96e";
@@ -53,6 +54,8 @@ type Result = Result3 | Result4 | null;
 export default function App() {
   const [mode, setMode] = useState<3 | 4>(3);
   const [courseName, setCourseName] = useState("");
+  const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const sessionId = getSessionId();
   const [names, setNames] = useState(["", "", "", ""]);
   const [scores, setScores] = useState<string[][]>(() =>
     Array(HOLES).fill(null).map(() => Array(4).fill(""))
@@ -229,8 +232,13 @@ export default function App() {
               padding: "6px 8px", textAlign: "left",
               background: "#1a2e1a", border: "1px solid #2a4a2a",
               borderRadius: 6, color: "#f5f0e8", fontSize: 13, outline: "none",
+              marginBottom: 6,
             }}
           />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "#6b8b6b" }}>{today}</span>
+            <span style={{ fontSize: 8, color: "#3a5a3a", fontFamily: "monospace" }}>ID: {sessionId.slice(0, 8)}</span>
+          </div>
         </div>
         {/* Player names */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
