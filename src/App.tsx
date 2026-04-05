@@ -52,6 +52,7 @@ type Result = Result3 | Result4 | null;
 
 export default function App() {
   const [mode, setMode] = useState<3 | 4>(3);
+  const [courseName, setCourseName] = useState("");
   const [names, setNames] = useState(["", "", "", ""]);
   const [scores, setScores] = useState<string[][]>(() =>
     Array(HOLES).fill(null).map(() => Array(4).fill(""))
@@ -187,7 +188,7 @@ export default function App() {
     return t;
   }, [results]);
 
-  useAutoSave({ mode: n, teamMode, names, pars, scores, opts, totals });
+  useAutoSave({ mode: n, teamMode, courseName, names, pars, scores, opts, totals });
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
@@ -216,6 +217,21 @@ export default function App() {
       </div>
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "12px 8px" }}>
+        {/* Course name */}
+        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>GOLF COURSE</div>
+          <input
+            value={courseName}
+            onChange={e => setCourseName(e.target.value)}
+            placeholder="ゴルフ場名を入力"
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "6px 8px", textAlign: "left",
+              background: "#1a2e1a", border: "1px solid #2a4a2a",
+              borderRadius: 6, color: "#f5f0e8", fontSize: 13, outline: "none",
+            }}
+          />
+        </div>
         {/* Player names */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>PLAYERS</div>

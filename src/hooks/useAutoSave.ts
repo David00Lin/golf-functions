@@ -6,6 +6,7 @@ import type { Opts } from "../types";
 interface SavePayload {
   mode: number;
   teamMode: string;
+  courseName: string;
   names: string[];
   pars: number[];
   scores: string[][];
@@ -29,6 +30,7 @@ export function useAutoSave(payload: SavePayload) {
         updated_at: new Date().toISOString(),
         mode: payload.mode,
         team_mode: payload.teamMode,
+        course_name: payload.courseName,
         names: payload.names,
         pars: payload.pars,
         scores: payload.scores,
@@ -43,6 +45,7 @@ export function useAutoSave(payload: SavePayload) {
   }, [
     payload.mode,
     payload.teamMode,
+    payload.courseName,
     JSON.stringify(payload.names),
     JSON.stringify(payload.pars),
     JSON.stringify(payload.scores),
