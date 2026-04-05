@@ -48,8 +48,8 @@ export default function App() {
   const [sessionDisplayDate, setSessionDisplayDate] = useState(
     new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
   );
-  const [sessionId, setSessionId] = useState(getSessionId());
-  const [names, setNames] = useState(["", "", "", ""]);
+  const [, setSessionId] = useState(getSessionId());
+  const [names, setNames] = useState(["Player1", "Player2", "Player3", "Player4"]);
   const [scores, setScores] = useState<string[][]>(() =>
     Array(HOLES).fill(null).map(() => Array(4).fill(""))
   );
@@ -104,7 +104,7 @@ export default function App() {
     setSessionId(id);
     setMode(3);
     setCourseName("");
-    setNames(["", "", "", ""]);
+    setNames(["Player1", "Player2", "Player3", "Player4"]);
     setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setPars(Array(HOLES).fill(4));
     setOpts({ carry: false, birdieReverse: false, truncate: false, push: false });
@@ -345,9 +345,8 @@ export default function App() {
               marginBottom: 6, opacity: ro ? 0.7 : 1,
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
-            <span style={{ fontSize: 8, color: "#3a5a3a", fontFamily: "monospace" }}>ID: {sessionId.slice(0, 8)}</span>
           </div>
         </div>
 
@@ -382,9 +381,9 @@ export default function App() {
               {TEAM_MODES.map(({ id, label }) => {
                 const active = teamMode === id;
                 let display = label;
-                if (id === "fixed_12_34") display = "固定\n1・2\nvs\n3・4";
-                if (id === "fixed_13_24") display = "固定\n1・3\nvs\n2・4";
-                if (id === "fixed_14_23") display = "固定\n1・4\nvs\n2・3";
+                if (id === "fixed_12_34") display = `固定\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
+                if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
+                if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
                 return (
                   <button key={id} onClick={() => setTeamMode(id)} style={{
                     padding: "7px 4px", borderRadius: 8,
