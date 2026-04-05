@@ -243,7 +243,7 @@ export default function App() {
         {mode === 4 && (
           <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch" }}>
               {TEAM_MODES.map(({ id, label }) => {
                 const active = teamMode === id;
                 let display = label;
@@ -259,7 +259,7 @@ export default function App() {
                     fontSize: 9, cursor: "pointer",
                     fontWeight: active ? "bold" : "normal",
                     whiteSpace: "pre-line", lineHeight: 1.4,
-                    textAlign: "center",
+                    textAlign: "center", height: "100%",
                   }}>
                     {display}
                   </button>
