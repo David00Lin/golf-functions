@@ -76,6 +76,14 @@ export default function App() {
         setTeamMode(data.team_mode);
         setSessionDisplayDate(formatDate(data.updated_at));
         checkAndSetReadOnly(data.updated_at);
+        setSavedSnapshot(JSON.stringify({
+          courseName: data.course_name ?? "",
+          names: data.names,
+          scores: data.scores,
+          opts: data.opts,
+          mode: data.mode,
+          teamMode: data.team_mode,
+        }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -94,13 +102,21 @@ export default function App() {
     setTeamMode(data.team_mode);
     setSessionDisplayDate(formatDate(data.updated_at));
     checkAndSetReadOnly(data.updated_at);
+    setSavedSnapshot(JSON.stringify({
+      courseName: data.course_name ?? "",
+      names: data.names,
+      scores: data.scores,
+      opts: data.opts,
+      mode: data.mode,
+      teamMode: data.team_mode,
+    }));
     setShowHistory(false);
   }
 
   // 新しいゲーム
   function handleNewSession() {
     if (!hasAnyInput) return;
-    if (!window.confirm("新しいゲームを開始しますか？\n現在の入力内容は保存されません。")) return;
+    if (isDirty && !window.confirm("新しいゲームを開始しますか？\n現在の入力内容は保存されません。")) return;
     startNewSession();
   }
 
@@ -116,6 +132,7 @@ export default function App() {
     setPushCounts(Array(HOLES).fill(0));
     setTeamMode("fixed_12_34");
     setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
+    setSavedSnapshot(null);
     setShowHistory(false);
   }
 
@@ -250,10 +267,21 @@ export default function App() {
     courseName.trim() !== "" &&
     names.slice(0, n).every(name => name.trim() !== "");
 
+  const allFilled = canSave &&
+    scores.every(row => row.slice(0, n).every(s => s !== ""));
+
+  // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  const currentSnapshot = useMemo(() =>
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode }),
+    [courseName, names, scores, opts, mode, teamMode]
+  );
+  const isDirty = savedSnapshot !== currentSnapshot;
+
   const [saving, setSaving] = useState(false);
 
   async function saveSession() {
-    if (!canSave) return;
+    if (!canSave || saving) return;
     setSaving(true);
     await supabase.from("sessions").upsert({
       id: getSessionId(),
@@ -268,8 +296,16 @@ export default function App() {
       opts,
       totals,
     });
+    setSavedSnapshot(currentSnapshot);
     setSaving(false);
   }
+
+  // 全項目入力済みで未保存の場合は自動保存
+  useEffect(() => {
+    if (!allFilled || !isDirty || isReadOnly || saving) return;
+    const timer = setTimeout(() => { saveSession(); }, 1500);
+    return () => clearTimeout(timer);
+  }, [allFilled, currentSnapshot, isReadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
@@ -644,7 +680,7 @@ export default function App() {
                 cursor: canSave ? "pointer" : "default",
               }}
             >
-              {saving ? "保存中..." : "ゲームの保存"}
+              {saving ? "保存中..." : !isDirty ? "保存済み" : "ゲームの保存"}
             </button>
             {!canSave && (
               <div style={{ fontSize: 9, color: "#3a5a3a", marginTop: 6 }}>
