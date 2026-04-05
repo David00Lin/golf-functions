@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { Opts } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
@@ -250,6 +250,15 @@ export default function App() {
   }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
 
   const results: Result[] = mode === 3 ? results3 : results4;
+
+  const halfTotals = useMemo(() => {
+    const t = Array(4).fill(0);
+    results.slice(0, 9).forEach(r => {
+      if (!r || r.tied) return;
+      r.pts.forEach((p, i) => { t[i] += p; });
+    });
+    return t;
+  }, [results]);
 
   const totals = useMemo(() => {
     const t = Array(4).fill(0);
@@ -516,7 +525,8 @@ export default function App() {
             const soloIdx = mode === 3 ? order[0] : null;
             const [tA4] = mode === 4 ? getTeams4(h) : [[], []];
             return (
-              <div key={h} style={{ borderBottom: "1px solid #1a3a1a" }}>
+              <React.Fragment key={h}>
+              <div style={{ borderBottom: "1px solid #1a3a1a" }}>
                 <div style={{
                   display: "grid", gridTemplateColumns: gridCols,
                   background: h % 2 === 0 ? "#0f1f0f" : "#0b190b",
@@ -619,6 +629,33 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* ハーフ小計（9H後） */}
+              {h === 8 && (
+                <div style={{
+                  display: "grid", gridTemplateColumns: gridCols,
+                  background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
+                  borderBottom: `2px solid ${GOLD}`,
+                }}>
+                  <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+                    <span style={{ fontSize: 7 }}>前半</span>
+                    <span>計</span>
+                  </div>
+                  {Array.from({ length: n }, (_, pi) => {
+                    const pt = halfTotals[pi];
+                    return (
+                      <div key={pi} style={{
+                        ...cell, padding: "5px 3px", textAlign: "center",
+                        fontSize: 13, fontWeight: "bold",
+                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                      }}>
+                        {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              </React.Fragment>
             );
           })}
         </div>
