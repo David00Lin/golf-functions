@@ -1,6 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import type { Opts } from "./types";
 import { useAutoSave } from "./hooks/useAutoSave";
-import { getSessionId } from "./lib/session";
+import { useSession } from "./hooks/useSession";
+import { supabase } from "./lib/supabase";
+import { getSessionId, newSession } from "./lib/session";
 
 const HOLES = 18;
 const GOLD = "#c8a96e";
@@ -25,37 +28,27 @@ function getRotateTeams(h: number, indices: number[]): [number[], number[]] {
   return [[i0, i3], [i1, i2]];
 }
 
-import type { Opts } from "./types";
-
 interface Result3 {
-  solo: number;
-  pair: number[];
-  soloTeam: number;
-  pairTeam: number;
-  diff: number;
-  mult: number;
-  tied: boolean;
-  pts: number[];
+  solo: number; pair: number[]; soloTeam: number; pairTeam: number;
+  diff: number; mult: number; tied: boolean; pts: number[];
 }
-
 interface Result4 {
-  tA: number[];
-  tB: number[];
-  scA: number;
-  scB: number;
-  diff: number;
-  mult: number;
-  tied: boolean;
-  pts: number[];
+  tA: number[]; tB: number[]; scA: number; scB: number;
+  diff: number; mult: number; tied: boolean; pts: number[];
 }
-
 type Result = Result3 | Result4 | null;
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
 
 export default function App() {
   const [mode, setMode] = useState<3 | 4>(3);
   const [courseName, setCourseName] = useState("");
-  const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
-  const sessionId = getSessionId();
+  const [sessionDisplayDate, setSessionDisplayDate] = useState(
+    new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
+  );
+  const [sessionId, setSessionId] = useState(getSessionId());
   const [names, setNames] = useState(["", "", "", ""]);
   const [scores, setScores] = useState<string[][]>(() =>
     Array(HOLES).fill(null).map(() => Array(4).fill(""))
@@ -66,6 +59,60 @@ export default function App() {
   });
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
   const [teamMode, setTeamMode] = useState("fixed_12_34");
+
+  const { isReadOnly, enableEdit, showHistory, toggleHistory, setShowHistory, historyList, checkAndSetReadOnly } = useSession();
+
+  // セッション復元
+  useEffect(() => {
+    const id = getSessionId();
+    supabase.from("sessions").select("*").eq("id", id).single()
+      .then(({ data }) => {
+        if (!data) return;
+        setMode(data.mode as 3 | 4);
+        setCourseName(data.course_name ?? "");
+        setNames(data.names);
+        setPars(data.pars);
+        setScores(data.scores);
+        setOpts(data.opts);
+        setTeamMode(data.team_mode);
+        setSessionDisplayDate(formatDate(data.updated_at));
+        checkAndSetReadOnly(data.updated_at);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 履歴から読み込み
+  async function loadSessionById(id: string) {
+    const { data } = await supabase.from("sessions").select("*").eq("id", id).single();
+    if (!data) return;
+    localStorage.setItem("golf_session_id", id);
+    setSessionId(id);
+    setMode(data.mode as 3 | 4);
+    setCourseName(data.course_name ?? "");
+    setNames(data.names);
+    setPars(data.pars);
+    setScores(data.scores);
+    setOpts(data.opts);
+    setTeamMode(data.team_mode);
+    setSessionDisplayDate(formatDate(data.updated_at));
+    checkAndSetReadOnly(data.updated_at);
+    setShowHistory(false);
+  }
+
+  // 新しいゲーム
+  function startNewSession() {
+    const id = newSession();
+    setSessionId(id);
+    setMode(3);
+    setCourseName("");
+    setNames(["", "", "", ""]);
+    setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
+    setPars(Array(HOLES).fill(4));
+    setOpts({ carry: false, birdieReverse: false, truncate: false, push: false });
+    setPushCounts(Array(HOLES).fill(0));
+    setTeamMode("fixed_12_34");
+    setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
+    setShowHistory(false);
+  }
 
   const n = mode;
 
@@ -191,10 +238,11 @@ export default function App() {
     return t;
   }, [results]);
 
-  useAutoSave({ mode: n, teamMode, courseName, names, pars, scores, opts, totals });
+  useAutoSave({ mode: n, teamMode, courseName, names, pars, scores, opts, totals, isReadOnly });
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
+  const ro = isReadOnly;
 
   return (
     <div style={{ minHeight: "100vh", background: "#1a2e1a", fontFamily: "'Georgia', serif", color: "#f5f0e8" }}>
@@ -203,21 +251,82 @@ export default function App() {
         background: "linear-gradient(135deg, #0f1f0f, #1a3a1a)",
         borderBottom: `2px solid ${GOLD}`,
         padding: "16px 16px 12px", textAlign: "center",
+        position: "relative",
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
           {([3, 4] as const).map(m => (
-            <button key={m} onClick={() => setMode(m)} style={{
+            <button key={m} onClick={() => !ro && setMode(m)} style={{
               padding: "5px 22px", borderRadius: 20,
               border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
               background: mode === m ? "#2a1f00" : "transparent",
               color: mode === m ? GOLD : "#6b8b6b",
-              fontSize: 13, cursor: "pointer", fontWeight: mode === m ? "bold" : "normal",
+              fontSize: 13, cursor: ro ? "default" : "pointer",
+              fontWeight: mode === m ? "bold" : "normal",
+              opacity: ro ? 0.5 : 1,
             }}>{m}人</button>
           ))}
         </div>
+        {/* 履歴ボタン */}
+        <button onClick={toggleHistory} style={{
+          position: "absolute", top: 16, right: 12,
+          padding: "4px 10px", borderRadius: 12,
+          border: `1px solid ${showHistory ? GOLD : "#2a4a2a"}`,
+          background: showHistory ? "#2a1f00" : "transparent",
+          color: showHistory ? GOLD : "#6b8b6b",
+          fontSize: 10, cursor: "pointer",
+        }}>履歴</button>
+        {/* 新しいゲームボタン */}
+        <button onClick={startNewSession} style={{
+          position: "absolute", top: 16, left: 12,
+          padding: "4px 10px", borderRadius: 12,
+          border: "1px solid #2a4a2a",
+          background: "transparent",
+          color: "#6b8b6b",
+          fontSize: 10, cursor: "pointer",
+        }}>新ゲーム</button>
       </div>
+
+      {/* 読み取り専用バナー */}
+      {ro && (
+        <div style={{
+          background: "#1a1000", borderBottom: `1px solid ${GOLD}`,
+          padding: "6px 16px", textAlign: "center",
+          fontSize: 11, color: GOLD, letterSpacing: 1,
+        }}>
+          表示モード（過去の記録）
+        </div>
+      )}
+
+      {/* 履歴パネル */}
+      {showHistory && (
+        <div style={{
+          background: "#0a160a", borderBottom: "1px solid #2a4a2a",
+          maxHeight: 280, overflowY: "auto",
+        }}>
+          {historyList.length === 0 ? (
+            <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>記録なし</div>
+          ) : historyList.map(s => (
+            <div key={s.id} onClick={() => loadSessionById(s.id)} style={{
+              padding: "10px 16px", borderBottom: "1px solid #1a2a1a",
+              cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div>
+                <div style={{ fontSize: 12, color: "#c8d8c8", marginBottom: 2 }}>
+                  {s.course_name || "（コース名なし）"}
+                </div>
+                <div style={{ fontSize: 9, color: "#4a6a4a" }}>
+                  {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
+                </div>
+              </div>
+              <div style={{ fontSize: 9, color: "#6b8b6b" }}>
+                {s.names.slice(0, s.mode).join(" / ")}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "12px 8px" }}>
         {/* Course name */}
@@ -227,19 +336,21 @@ export default function App() {
             value={courseName}
             onChange={e => setCourseName(e.target.value)}
             placeholder="ゴルフ場名を入力"
+            disabled={ro}
             style={{
               width: "100%", boxSizing: "border-box",
               padding: "6px 8px", textAlign: "left",
               background: "#1a2e1a", border: "1px solid #2a4a2a",
-              borderRadius: 6, color: "#f5f0e8", fontSize: 13, outline: "none",
-              marginBottom: 6,
+              borderRadius: 6, color: ro ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+              marginBottom: 6, opacity: ro ? 0.7 : 1,
             }}
           />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 10, color: "#6b8b6b" }}>{today}</span>
+            <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
             <span style={{ fontSize: 8, color: "#3a5a3a", fontFamily: "monospace" }}>ID: {sessionId.slice(0, 8)}</span>
           </div>
         </div>
+
         {/* Player names */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>PLAYERS</div>
@@ -249,11 +360,13 @@ export default function App() {
                 <input
                   value={names[i]}
                   onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
+                  disabled={ro}
                   style={{
                     width: "100%", boxSizing: "border-box",
                     padding: "6px 2px", textAlign: "center",
                     background: "#1a2e1a", border: "1px solid #2a4a2a",
-                    borderRadius: 6, color: "#f5f0e8", fontSize: 13, outline: "none",
+                    borderRadius: 6, color: ro ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                    opacity: ro ? 0.7 : 1,
                   }}
                 />
               </div>
@@ -265,7 +378,7 @@ export default function App() {
         {mode === 4 && (
           <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: ro ? "none" : "auto", opacity: ro ? 0.6 : 1 }}>
               {TEAM_MODES.map(({ id, label }) => {
                 const active = teamMode === id;
                 let display = label;
@@ -294,7 +407,7 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: ro ? "none" : "auto", opacity: ro ? 0.6 : 1 }}>
             {([
               { k: "birdieReverse" as const, l: "バーディー逆転" },
               { k: "truncate" as const, l: "1の位切捨て" },
@@ -315,7 +428,6 @@ export default function App() {
 
         {/* Score grid */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, border: "1px solid #2a4a2a", overflow: "hidden", marginBottom: 10 }}>
-          {/* Column headers */}
           <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#0a160a", borderBottom: "1px solid #2a4a2a" }}>
             <div style={{ padding: "7px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>H</div>
             {Array.from({ length: n }, (_, i) => (
@@ -329,7 +441,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Holes */}
           {Array(HOLES).fill(null).map((_, h) => {
             const r = results[h];
             const order = orders[h];
@@ -337,22 +448,20 @@ export default function App() {
             const [tA4] = mode === 4 ? getTeams4(h) : [[], []];
             return (
               <div key={h} style={{ borderBottom: "1px solid #1a3a1a" }}>
-                {/* Score row */}
                 <div style={{
                   display: "grid", gridTemplateColumns: gridCols,
                   background: h % 2 === 0 ? "#0f1f0f" : "#0b190b",
                 }}>
-                  {/* Hole + par */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 2px" }}>
                     <span style={{ fontSize: 11, fontWeight: "bold", color: GOLD }}>{h + 1}</span>
-                    <div style={{ display: "flex", gap: 1, marginTop: 2 }}>
+                    <div style={{ display: "flex", gap: 1, marginTop: 2, pointerEvents: ro ? "none" : "auto" }}>
                       {[3, 4, 5].map(p => (
                         <button key={p} onClick={() => setPars(prev => prev.map((v, ph) => ph === h ? p : v))} style={{
                           padding: "1px 3px", fontSize: 7, borderRadius: 3,
                           border: `1px solid ${pars[h] === p ? GOLD : "#2a4a2a"}`,
                           background: pars[h] === p ? "#2a1f00" : "transparent",
                           color: pars[h] === p ? GOLD : "#4a6a4a",
-                          cursor: "pointer",
+                          cursor: ro ? "default" : "pointer",
                         }}>{p}</button>
                       ))}
                     </div>
@@ -360,6 +469,7 @@ export default function App() {
                       <select
                         value={pushCounts[h]}
                         onChange={e => setPushCounts(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
+                        disabled={ro}
                         style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#1a2e1a", border: "1px solid #2a4a2a", color: GOLD }}
                       >
                         <option value={0}>P×0</option>
@@ -397,6 +507,7 @@ export default function App() {
                           value={sc}
                           onChange={e => setScore(h, pi, e.target.value)}
                           min={1} max={15}
+                          disabled={ro}
                           style={{
                             width: "100%", boxSizing: "border-box",
                             padding: "7px 0", textAlign: "center",
@@ -406,6 +517,7 @@ export default function App() {
                             fontSize: 17, fontWeight: "bold",
                             color: scoreColor, outline: "none",
                             MozAppearance: "textfield",
+                            opacity: ro ? 0.8 : 1,
                           } as React.CSSProperties}
                           placeholder="·"
                         />
@@ -415,7 +527,6 @@ export default function App() {
                   })}
                 </div>
 
-                {/* Result row */}
                 {r && !r.tied && (
                   <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#080f08" }}>
                     <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: "#3a5a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
@@ -463,11 +574,28 @@ export default function App() {
           ))}
         </div>
 
-        <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, paddingBottom: 20, letterSpacing: 1 }}>
+        <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
             ? "3人版：単独はペア各人と個別決済（方法A）• 打順=前H昇順"
             : `4人版：${TEAM_MODES.find(t => t.id === teamMode)?.label.replace("\n", " ")}`}
         </div>
+
+        {/* 編集モードボタン（過去記録閲覧時） */}
+        {ro && (
+          <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
+            <button onClick={enableEdit} style={{
+              padding: "10px 32px", borderRadius: 24,
+              border: `1.5px solid ${GOLD}`,
+              background: "#2a1f00",
+              color: GOLD,
+              fontSize: 13, cursor: "pointer", fontWeight: "bold",
+              letterSpacing: 1,
+            }}>
+              編集モードに切り替える
+            </button>
+          </div>
+        )}
+        {!ro && <div style={{ paddingBottom: 24 }} />}
       </div>
     </div>
   );
