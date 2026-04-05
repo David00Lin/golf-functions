@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import type { Opts } from "./types";
-import { useAutoSave } from "./hooks/useAutoSave";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
-import { getSessionId, newSession } from "./lib/session";
+import { getSessionId, getDeviceId, newSession } from "./lib/session";
 
 const HOLES = 18;
 const GOLD = "#c8a96e";
@@ -99,6 +98,12 @@ export default function App() {
   }
 
   // 新しいゲーム
+  function handleNewSession() {
+    if (!hasAnyInput) return;
+    if (!window.confirm("新しいゲームを開始しますか？\n現在の入力内容は保存されません。")) return;
+    startNewSession();
+  }
+
   function startNewSession() {
     const id = newSession();
     setSessionId(id);
@@ -238,7 +243,33 @@ export default function App() {
     return t;
   }, [results]);
 
-  useAutoSave({ mode: n, teamMode, courseName, names, pars, scores, opts, totals, isReadOnly });
+  const hasAnyInput = courseName.trim() !== "" ||
+    scores.some(row => row.slice(0, n).some(s => s !== ""));
+
+  const canSave = !isReadOnly &&
+    courseName.trim() !== "" &&
+    names.slice(0, n).every(name => name.trim() !== "");
+
+  const [saving, setSaving] = useState(false);
+
+  async function saveSession() {
+    if (!canSave) return;
+    setSaving(true);
+    await supabase.from("sessions").upsert({
+      id: getSessionId(),
+      device_id: getDeviceId(),
+      updated_at: new Date().toISOString(),
+      mode: n,
+      team_mode: teamMode,
+      course_name: courseName,
+      names,
+      pars,
+      scores,
+      opts,
+      totals,
+    });
+    setSaving(false);
+  }
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
@@ -278,14 +309,17 @@ export default function App() {
           fontSize: 10, cursor: "pointer",
         }}>履歴</button>
         {/* 新しいゲームボタン */}
-        <button onClick={startNewSession} style={{
-          position: "absolute", top: 16, left: 12,
-          padding: "4px 10px", borderRadius: 12,
-          border: "1px solid #2a4a2a",
-          background: "transparent",
-          color: "#6b8b6b",
-          fontSize: 10, cursor: "pointer",
-        }}>新ゲーム</button>
+        <button
+          onClick={handleNewSession}
+          disabled={!hasAnyInput}
+          style={{
+            position: "absolute", top: 16, left: 12,
+            padding: "4px 10px", borderRadius: 12,
+            border: `1px solid ${hasAnyInput ? "#4a6a4a" : "#2a3a2a"}`,
+            background: "transparent",
+            color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
+            fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
+          }}>新ゲーム</button>
       </div>
 
       {/* 読み取り専用バナー */}
@@ -581,7 +615,7 @@ export default function App() {
 
         {/* 編集モードボタン（過去記録閲覧時） */}
         {ro && (
-          <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
+          <div style={{ marginTop: 16, textAlign: "center" }}>
             <button onClick={enableEdit} style={{
               padding: "10px 32px", borderRadius: 24,
               border: `1.5px solid ${GOLD}`,
@@ -594,7 +628,31 @@ export default function App() {
             </button>
           </div>
         )}
-        {!ro && <div style={{ paddingBottom: 24 }} />}
+
+        {/* ゲームの保存ボタン */}
+        {!ro && (
+          <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
+            <button
+              onClick={saveSession}
+              disabled={!canSave || saving}
+              style={{
+                padding: "12px 40px", borderRadius: 24,
+                border: `1.5px solid ${canSave ? GREEN : "#2a4a2a"}`,
+                background: canSave ? "rgba(74,155,127,0.15)" : "transparent",
+                color: canSave ? GREEN : "#2a4a2a",
+                fontSize: 14, fontWeight: "bold", letterSpacing: 1,
+                cursor: canSave ? "pointer" : "default",
+              }}
+            >
+              {saving ? "保存中..." : "ゲームの保存"}
+            </button>
+            {!canSave && (
+              <div style={{ fontSize: 9, color: "#3a5a3a", marginTop: 6 }}>
+                コース名・プレイヤー名をすべて入力してください
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
