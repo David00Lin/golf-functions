@@ -435,7 +435,8 @@ export default function App() {
     if (!canSave || isDirty) return;
     await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
     const token = generateShareToken();
-    await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
+    const { error } = await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
+    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
     if (role === "join") setJoinCode(token);
     else setViewCode(token);
   }
@@ -443,9 +444,12 @@ export default function App() {
   async function openByShareCode() {
     const token = shareInput.trim().toUpperCase();
     if (token.length !== 6) return;
-    const { data: tokenData } = await supabase
+    const { data: tokenData, error: tokenError } = await supabase
       .from("share_tokens").select("session_id, role").eq("token", token).single();
-    if (!tokenData) { alert("コードが見つかりません"); return; }
+    if (tokenError || !tokenData) {
+      alert(tokenError ? `エラー: ${tokenError.message}` : "コードが見つかりません");
+      return;
+    }
     const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
     if (!data) return;
     const snap = JSON.stringify({
