@@ -297,6 +297,29 @@ export default function App() {
     return t;
   }, [results]);
 
+  // 精算：誰が誰にいくら払うか（最小取引数）
+  const settlement = useMemo(() => {
+    const debtors:   { idx: number; amount: number }[] = [];
+    const creditors: { idx: number; amount: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      if (totals[i] < 0) debtors.push({ idx: i, amount: -totals[i] });
+      else if (totals[i] > 0) creditors.push({ idx: i, amount: totals[i] });
+    }
+    debtors.sort((a, b) => b.amount - a.amount);
+    creditors.sort((a, b) => b.amount - a.amount);
+    const txs: { from: number; to: number; amount: number }[] = [];
+    let di = 0, ci = 0;
+    while (di < debtors.length && ci < creditors.length) {
+      const pay = Math.min(debtors[di].amount, creditors[ci].amount);
+      txs.push({ from: debtors[di].idx, to: creditors[ci].idx, amount: pay });
+      debtors[di].amount -= pay;
+      creditors[ci].amount -= pay;
+      if (debtors[di].amount === 0) di++;
+      if (creditors[ci].amount === 0) ci++;
+    }
+    return txs;
+  }, [totals, n]);
+
   const hasAnyInput = courseName.trim() !== "" ||
     scores.some(row => row.slice(0, n).some(s => s !== ""));
 
@@ -711,6 +734,42 @@ export default function App() {
               </span>
             </div>
           ))}
+
+          {/* 精算 */}
+          {settlement.length > 0 && (
+            <>
+              <div style={{
+                margin: "12px 0 10px",
+                borderTop: "1px solid #2a4a2a",
+                paddingTop: 10,
+                fontSize: 9, letterSpacing: 3, color: "#6b8b6b", textAlign: "center",
+              }}>
+                精 算
+              </div>
+              {settlement.map((tx, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "7px 0",
+                  borderBottom: i < settlement.length - 1 ? "1px solid #1a2a1a" : "none",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <span style={{
+                      fontSize: 13, color: RED, fontWeight: "bold",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
+                    }}>{names[tx.from]}</span>
+                    <span style={{ fontSize: 14, color: "#3a6a3a", flexShrink: 0 }}>→</span>
+                    <span style={{
+                      fontSize: 13, color: GOLD, fontWeight: "bold",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
+                    }}>{names[tx.to]}</span>
+                  </div>
+                  <span style={{ fontSize: 17, fontWeight: "bold", color: "#f5f0e8", flexShrink: 0 }}>
+                    {tx.amount}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
