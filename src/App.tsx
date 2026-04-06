@@ -58,8 +58,10 @@ export default function App() {
   });
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
   const [teamMode, setTeamMode] = useState("fixed_12_34");
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+  const isViewing = viewingSessionId !== null;
 
-  const { isReadOnly, enableEdit, showHistory, toggleHistory, setShowHistory, historyList, checkAndSetReadOnly } = useSession();
+  const { showHistory, toggleHistory, setShowHistory, historyList } = useSession();
 
   // セッション復元
   useEffect(() => {
@@ -75,7 +77,6 @@ export default function App() {
         setOpts(data.opts);
         setTeamMode(data.team_mode);
         setSessionDisplayDate(formatDate(data.updated_at));
-        checkAndSetReadOnly(data.updated_at);
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
           names: data.names,
@@ -87,12 +88,12 @@ export default function App() {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 履歴から読み込み
+  // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
+    if (isDirty && !window.confirm("現在の入力内容は保存されません。過去の記録を表示しますか？")) return;
     const { data } = await supabase.from("sessions").select("*").eq("id", id).single();
     if (!data) return;
-    localStorage.setItem("golf_session_id", id);
-    setSessionId(id);
+    // localStorage / sessionId は変更しない（現セッションIDを守る）
     setMode(data.mode as 3 | 4);
     setCourseName(data.course_name ?? "");
     setNames(data.names);
@@ -101,7 +102,6 @@ export default function App() {
     setOpts(data.opts);
     setTeamMode(data.team_mode);
     setSessionDisplayDate(formatDate(data.updated_at));
-    checkAndSetReadOnly(data.updated_at);
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
       names: data.names,
@@ -110,7 +110,17 @@ export default function App() {
       mode: data.mode,
       teamMode: data.team_mode,
     }));
+    setViewingSessionId(id);
     setShowHistory(false);
+  }
+
+  // 閲覧中のゲームを継続する
+  function handleContinueSession() {
+    if (!viewingSessionId) return;
+    localStorage.setItem("golf_session_id", viewingSessionId);
+    setSessionId(viewingSessionId);
+    setViewingSessionId(null);
+    // savedSnapshot は loadSessionById で設定済み → isDirty=false（保存済み扱い）
   }
 
   // 新しいゲーム
@@ -134,6 +144,7 @@ export default function App() {
     setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
     setSavedSnapshot(null);
     setShowHistory(false);
+    setViewingSessionId(null);
   }
 
   const n = mode;
@@ -272,7 +283,7 @@ export default function App() {
   const hasAnyInput = courseName.trim() !== "" ||
     scores.some(row => row.slice(0, n).some(s => s !== ""));
 
-  const canSave = !isReadOnly &&
+  const canSave = !isViewing &&
     courseName.trim() !== "" &&
     names.slice(0, n).every(name => name.trim() !== "");
 
@@ -311,14 +322,13 @@ export default function App() {
 
   // 全項目入力済みで未保存の場合は自動保存
   useEffect(() => {
-    if (!allFilled || !isDirty || isReadOnly || saving) return;
+    if (!allFilled || !isDirty || saving) return;
     const timer = setTimeout(() => { saveSession(); }, 1500);
     return () => clearTimeout(timer);
-  }, [allFilled, currentSnapshot, isReadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allFilled, currentSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
-  const ro = isReadOnly;
 
   return (
     <div style={{ minHeight: "100vh", background: "#1a2e1a", fontFamily: "'Georgia', serif", color: "#f5f0e8" }}>
@@ -333,14 +343,14 @@ export default function App() {
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
           {([3, 4] as const).map(m => (
-            <button key={m} onClick={() => !ro && setMode(m)} style={{
+            <button key={m} onClick={() => !isViewing && setMode(m)} style={{
               padding: "5px 22px", borderRadius: 20,
               border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
               background: mode === m ? "#2a1f00" : "transparent",
               color: mode === m ? GOLD : "#6b8b6b",
-              fontSize: 13, cursor: ro ? "default" : "pointer",
+              fontSize: 13, cursor: isViewing ? "default" : "pointer",
               fontWeight: mode === m ? "bold" : "normal",
-              opacity: ro ? 0.5 : 1,
+              opacity: isViewing ? 0.5 : 1,
             }}>{m}人</button>
           ))}
         </div>
@@ -367,14 +377,14 @@ export default function App() {
           }}>新ゲーム</button>
       </div>
 
-      {/* 読み取り専用バナー */}
-      {ro && (
+      {/* 閲覧モードバナー */}
+      {isViewing && (
         <div style={{
           background: "#1a1000", borderBottom: `1px solid ${GOLD}`,
           padding: "6px 16px", textAlign: "center",
           fontSize: 11, color: GOLD, letterSpacing: 1,
         }}>
-          表示モード（過去の記録）
+          過去の記録を閲覧中
         </div>
       )}
 
@@ -415,13 +425,13 @@ export default function App() {
             value={courseName}
             onChange={e => setCourseName(e.target.value)}
             placeholder="ゴルフ場名を入力"
-            disabled={ro}
+            disabled={isViewing}
             style={{
               width: "100%", boxSizing: "border-box",
               padding: "6px 8px", textAlign: "left",
               background: "#1a2e1a", border: "1px solid #2a4a2a",
-              borderRadius: 6, color: ro ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-              marginBottom: 6, opacity: ro ? 0.7 : 1,
+              borderRadius: 6, color: isViewing ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+              marginBottom: 6, opacity: isViewing ? 0.7 : 1,
             }}
           />
           <div style={{ textAlign: "right" }}>
@@ -438,13 +448,13 @@ export default function App() {
                 <input
                   value={names[i]}
                   onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
-                  disabled={ro}
+                  disabled={isViewing}
                   style={{
                     width: "100%", boxSizing: "border-box",
                     padding: "6px 2px", textAlign: "center",
                     background: "#1a2e1a", border: "1px solid #2a4a2a",
-                    borderRadius: 6, color: ro ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-                    opacity: ro ? 0.7 : 1,
+                    borderRadius: 6, color: isViewing ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                    opacity: isViewing ? 0.7 : 1,
                   }}
                 />
               </div>
@@ -456,7 +466,7 @@ export default function App() {
         {mode === 4 && (
           <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
             <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: ro ? "none" : "auto", opacity: ro ? 0.6 : 1 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
               {TEAM_MODES.map(({ id, label }) => {
                 const active = teamMode === id;
                 let display = label;
@@ -485,7 +495,7 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: ro ? "none" : "auto", opacity: ro ? 0.6 : 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
             {([
               { k: "birdieReverse" as const, l: "バーディー逆転" },
               { k: "truncate" as const, l: "1の位切捨て" },
@@ -533,14 +543,14 @@ export default function App() {
                 }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 2px" }}>
                     <span style={{ fontSize: 11, fontWeight: "bold", color: GOLD }}>{h + 1}</span>
-                    <div style={{ display: "flex", gap: 1, marginTop: 2, pointerEvents: ro ? "none" : "auto" }}>
+                    <div style={{ display: "flex", gap: 1, marginTop: 2, pointerEvents: isViewing ? "none" : "auto" }}>
                       {[3, 4, 5].map(p => (
                         <button key={p} onClick={() => setPars(prev => prev.map((v, ph) => ph === h ? p : v))} style={{
                           padding: "1px 3px", fontSize: 7, borderRadius: 3,
                           border: `1px solid ${pars[h] === p ? GOLD : "#2a4a2a"}`,
                           background: pars[h] === p ? "#2a1f00" : "transparent",
                           color: pars[h] === p ? GOLD : "#4a6a4a",
-                          cursor: ro ? "default" : "pointer",
+                          cursor: isViewing ? "default" : "pointer",
                         }}>{p}</button>
                       ))}
                     </div>
@@ -548,7 +558,7 @@ export default function App() {
                       <select
                         value={pushCounts[h]}
                         onChange={e => setPushCounts(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
-                        disabled={ro}
+                        disabled={isViewing}
                         style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#1a2e1a", border: "1px solid #2a4a2a", color: GOLD }}
                       >
                         <option value={0}>P×0</option>
@@ -586,7 +596,7 @@ export default function App() {
                           value={sc}
                           onChange={e => setScore(h, pi, e.target.value)}
                           min={1} max={15}
-                          disabled={ro}
+                          disabled={isViewing}
                           style={{
                             width: "100%", boxSizing: "border-box",
                             padding: "7px 0", textAlign: "center",
@@ -596,7 +606,7 @@ export default function App() {
                             fontSize: 17, fontWeight: "bold",
                             color: scoreColor, outline: "none",
                             MozAppearance: "textfield",
-                            opacity: ro ? 0.8 : 1,
+                            opacity: isViewing ? 0.8 : 1,
                           } as React.CSSProperties}
                           placeholder="·"
                         />
@@ -686,24 +696,23 @@ export default function App() {
             : `4人版：${TEAM_MODES.find(t => t.id === teamMode)?.label.replace("\n", " ")}`}
         </div>
 
-        {/* 編集モードボタン（過去記録閲覧時） */}
-        {ro && (
-          <div style={{ marginTop: 16, textAlign: "center" }}>
-            <button onClick={enableEdit} style={{
+        {/* ゲームの保存ボタン */}
+        {/* 閲覧モード: このゲームを続けるボタン */}
+        {isViewing && (
+          <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
+            <button onClick={handleContinueSession} style={{
               padding: "10px 32px", borderRadius: 24,
               border: `1.5px solid ${GOLD}`,
-              background: "#2a1f00",
-              color: GOLD,
-              fontSize: 13, cursor: "pointer", fontWeight: "bold",
-              letterSpacing: 1,
+              background: "#2a1f00", color: GOLD,
+              fontSize: 13, cursor: "pointer", fontWeight: "bold", letterSpacing: 1,
             }}>
-              編集モードに切り替える
+              このゲームを続ける
             </button>
           </div>
         )}
 
-        {/* ゲームの保存ボタン */}
-        {!ro && (
+        {/* 通常モード: 保存ボタン */}
+        {!isViewing && (
           <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
             <button
               onClick={saveSession}

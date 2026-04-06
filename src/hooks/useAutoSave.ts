@@ -12,7 +12,6 @@ interface SavePayload {
   scores: string[][];
   opts: Opts;
   totals: number[];
-  isReadOnly: boolean;
 }
 
 export function useAutoSave(payload: SavePayload) {
@@ -20,8 +19,6 @@ export function useAutoSave(payload: SavePayload) {
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-
-    if (payload.isReadOnly) return;
 
     timer.current = setTimeout(async () => {
       const sessionId = getSessionId();
@@ -46,7 +43,6 @@ export function useAutoSave(payload: SavePayload) {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [
-    payload.isReadOnly,
     payload.mode,
     payload.teamMode,
     payload.courseName,

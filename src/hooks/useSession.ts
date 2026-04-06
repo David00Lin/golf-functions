@@ -11,16 +11,9 @@ export interface SessionSummary {
   mode: number;
 }
 
-const TODAY = new Date().toISOString().slice(0, 10);
-
 export function useSession() {
-  const [isReadOnly, setIsReadOnly] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<SessionSummary[]>([]);
-
-  function checkAndSetReadOnly(updatedAt: string) {
-    setIsReadOnly(updatedAt.slice(0, 10) !== TODAY);
-  }
 
   async function fetchHistory() {
     const deviceId = getDeviceId();
@@ -39,12 +32,9 @@ export function useSession() {
   }
 
   return {
-    isReadOnly,
-    enableEdit: () => setIsReadOnly(false),
     showHistory,
     setShowHistory,
     toggleHistory,
     historyList,
-    checkAndSetReadOnly,
   };
 }
