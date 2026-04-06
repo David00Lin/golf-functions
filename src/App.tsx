@@ -418,9 +418,6 @@ export default function App() {
     courseName.trim() !== "" &&
     names.slice(0, n).every(name => name.trim() !== "");
 
-  const allFilled = canSave &&
-    scores.every(row => row.slice(0, n).every(s => s !== ""));
-
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
@@ -500,12 +497,12 @@ export default function App() {
     setSaving(false);
   }
 
-  // 全項目入力済みで未保存の場合は自動保存
+  // コース名・プレイヤー名が入力済みで未保存の場合は自動保存（スコア途中入力もDB同期）
   useEffect(() => {
-    if (!allFilled || !isDirty || saving) return;
+    if (!canSave || !isDirty || saving) return;
     const timer = setTimeout(() => { saveSession(); }, 1500);
     return () => clearTimeout(timer);
-  }, [allFilled, currentSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canSave, currentSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridCols = `36px repeat(${n}, 1fr)`;
   const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
@@ -1007,27 +1004,33 @@ export default function App() {
             )}
             {/* 招待・共有はオーナーのみ表示 */}
             <div style={{ marginTop: 10, display: isParticipant ? "none" : "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+              {/* 招待リンク: 設定入力済み + 保存済みの場合のみ有効 */}
               <button
                 onClick={copyInviteLink}
+                disabled={!canSave || isDirty}
+                title={isDirty ? "保存してから共有できます" : !canSave ? "コース名・プレイヤー名を入力してください" : ""}
                 style={{
                   padding: "6px 16px", borderRadius: 20,
-                  border: `1px solid ${copied ? GOLD : "#2a4a2a"}`,
+                  border: `1px solid ${copied ? GOLD : (canSave && !isDirty) ? "#2a4a2a" : "#1a2a1a"}`,
                   background: "transparent",
-                  color: copied ? GOLD : "#4a6a4a",
-                  fontSize: 11, cursor: "pointer", letterSpacing: 1,
+                  color: copied ? GOLD : (canSave && !isDirty) ? "#4a6a4a" : "#2a3a2a",
+                  fontSize: 11, cursor: (canSave && !isDirty) ? "pointer" : "default", letterSpacing: 1,
+                  opacity: (canSave && !isDirty) ? 1 : 0.4,
                 }}
               >
                 {copied ? "コピーしました" : "招待リンクをコピー"}
               </button>
               <button
                 onClick={issueShareCode}
-                disabled={!canSave}
+                disabled={!canSave || isDirty}
+                title={isDirty ? "保存してから共有できます" : !canSave ? "コース名・プレイヤー名を入力してください" : ""}
                 style={{
                   padding: "6px 16px", borderRadius: 20,
-                  border: `1px solid ${canSave ? "#2a4a6a" : "#2a3a2a"}`,
+                  border: `1px solid ${(canSave && !isDirty) ? "#2a4a6a" : "#1a2a1a"}`,
                   background: "transparent",
-                  color: canSave ? "#4a7a9b" : "#3a4a3a",
-                  fontSize: 11, cursor: canSave ? "pointer" : "default", letterSpacing: 1,
+                  color: (canSave && !isDirty) ? "#4a7a9b" : "#2a3a2a",
+                  fontSize: 11, cursor: (canSave && !isDirty) ? "pointer" : "default", letterSpacing: 1,
+                  opacity: (canSave && !isDirty) ? 1 : 0.4,
                 }}
               >
                 共有コードを発行
