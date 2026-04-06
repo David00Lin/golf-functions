@@ -376,6 +376,15 @@ export default function App() {
     return t;
   }, [results]);
 
+  const backTotals = useMemo(() => {
+    const t = Array(4).fill(0);
+    results.slice(9, 18).forEach(r => {
+      if (!r || r.tied) return;
+      r.pts.forEach((p, i) => { t[i] += p; });
+    });
+    return t;
+  }, [results]);
+
   const totals = useMemo(() => {
     const t = Array(4).fill(0);
     results.forEach(r => {
@@ -687,7 +696,8 @@ export default function App() {
 
         {/* Player names */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>PLAYERS</div>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>PLAYERS</div>
+          <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>1H の打順に入力してください</div>
           <div style={{ display: "flex", gap: 6 }}>
             {Array.from({ length: n }, (_, i) => (
               <div key={i} style={{ flex: 1 }}>
@@ -891,6 +901,32 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* 後半小計（18H後） */}
+              {h === 17 && (
+                <div style={{
+                  display: "grid", gridTemplateColumns: gridCols,
+                  background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
+                  borderBottom: `2px solid ${GOLD}`,
+                }}>
+                  <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+                    <span style={{ fontSize: 7 }}>後半</span>
+                    <span>計</span>
+                  </div>
+                  {Array.from({ length: n }, (_, pi) => {
+                    const pt = backTotals[pi];
+                    return (
+                      <div key={pi} style={{
+                        ...cell, padding: "5px 3px", textAlign: "center",
+                        fontSize: 13, fontWeight: "bold",
+                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                      }}>
+                        {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* ハーフ小計（9H後） */}
               {h === 8 && (
