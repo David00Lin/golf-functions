@@ -68,7 +68,7 @@ export default function App() {
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
 
-  const { showHistory, toggleHistory, setShowHistory, historyList } = useSession();
+  const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
   // セッション復元
   useEffect(() => {
@@ -125,6 +125,15 @@ export default function App() {
   function handleModeChange(m: 3 | 4) {
     setMode(m);
     setTeamMode(m === 3 ? "order_1_23" : "order_14_23");
+  }
+
+  // 履歴削除
+  async function deleteSessionById(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm("この記録を削除しますか？")) return;
+    await supabase.from("sessions").delete().eq("id", id);
+    if (viewingSessionId === id) startNewSession();
+    fetchHistory();
   }
 
   // 閲覧中のゲームを継続する
@@ -440,8 +449,9 @@ export default function App() {
             <div key={s.id} onClick={() => loadSessionById(s.id)} style={{
               padding: "10px 16px", borderBottom: "1px solid #1a2a1a",
               cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+              gap: 8,
             }}>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 12, color: "#c8d8c8", marginBottom: 2 }}>
                   {s.course_name || "（コース名なし）"}
                 </div>
@@ -449,9 +459,17 @@ export default function App() {
                   {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
                 </div>
               </div>
-              <div style={{ fontSize: 9, color: "#6b8b6b" }}>
+              <div style={{ fontSize: 9, color: "#6b8b6b", flexShrink: 0 }}>
                 {s.names.slice(0, s.mode).join(" / ")}
               </div>
+              <button
+                onClick={(e) => deleteSessionById(s.id, e)}
+                style={{
+                  flexShrink: 0, padding: "3px 7px", borderRadius: 4,
+                  border: "1px solid #3a2a2a", background: "transparent",
+                  color: "#6a4a4a", fontSize: 13, cursor: "pointer", lineHeight: 1,
+                }}
+              >×</button>
             </div>
           ))}
         </div>

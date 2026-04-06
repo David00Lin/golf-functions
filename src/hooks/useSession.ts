@@ -36,5 +36,6 @@ export function useSession() {
     setShowHistory,
     toggleHistory,
     historyList,
+    fetchHistory,
   };
 }
