@@ -68,7 +68,9 @@ export default function App() {
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
   const [isSharedView, setIsSharedView] = useState(false);
+  const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
+  const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
 
@@ -115,6 +117,7 @@ export default function App() {
     if (sid) {
       localStorage.setItem("golf_session_id", sid);
       setSessionId(sid);
+      setIsParticipant(true); // 招待リンク経由 = 参加者（設定変更不可）
     }
     const id = sid ?? getSessionId();
     supabase.from("sessions").select("*").eq("id", id).single()
@@ -192,6 +195,7 @@ export default function App() {
       teamMode: data.team_mode,
     }));
     setViewingSessionId(id);
+    setIsParticipant(false); // 自分の履歴 = オーナー扱い
     setShowHistory(false);
   }
 
@@ -241,6 +245,7 @@ export default function App() {
     setSavedSnapshot(null);
     setShowHistory(false);
     setViewingSessionId(null);
+    setIsParticipant(false);
     setIsSharedView(false);
     setShareCode(null);
     setShareInput("");
@@ -517,17 +522,28 @@ export default function App() {
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
-          {([3, 4] as const).map(m => (
-            <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
+          {isParticipant ? (
+            // 参加者: オーナーが設定した人数のみ表示（切り替え不可）
+            <div style={{
               padding: "5px 22px", borderRadius: 20,
-              border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
-              background: mode === m ? "#2a1f00" : "transparent",
-              color: mode === m ? GOLD : "#6b8b6b",
-              fontSize: 13, cursor: isReadOnly ? "default" : "pointer",
-              fontWeight: mode === m ? "bold" : "normal",
-              opacity: isReadOnly ? 0.5 : 1,
-            }}>{m}人</button>
-          ))}
+              border: `1.5px solid ${GOLD}`,
+              background: "#2a1f00", color: GOLD,
+              fontSize: 13, fontWeight: "bold",
+            }}>{mode}人</div>
+          ) : (
+            // オーナー: 切り替えボタン表示
+            ([3, 4] as const).map(m => (
+              <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
+                padding: "5px 22px", borderRadius: 20,
+                border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
+                background: mode === m ? "#2a1f00" : "transparent",
+                color: mode === m ? GOLD : "#6b8b6b",
+                fontSize: 13, cursor: isReadOnly ? "default" : "pointer",
+                fontWeight: mode === m ? "bold" : "normal",
+                opacity: isReadOnly ? 0.5 : 1,
+              }}>{m}人</button>
+            ))
+          )}
         </div>
         {/* 履歴ボタン */}
         <button onClick={toggleHistory} style={{
@@ -552,14 +568,19 @@ export default function App() {
           }}>新ゲーム</button>
       </div>
 
-      {/* 閲覧モードバナー */}
-      {(isViewing || isSharedView) && (
+      {/* バナー */}
+      {(isViewing || isSharedView || isParticipant) && (
         <div style={{
-          background: "#1a1000", borderBottom: `1px solid ${GOLD}`,
+          background: isParticipant ? "#0a1a2a" : "#1a1000",
+          borderBottom: `1px solid ${isParticipant ? "#2a4a6a" : GOLD}`,
           padding: "6px 16px", textAlign: "center",
-          fontSize: 11, color: GOLD, letterSpacing: 1,
+          fontSize: 11, color: isParticipant ? "#4a9bdb" : GOLD, letterSpacing: 1,
         }}>
-          {isSharedView ? "共有された記録を閲覧中（編集不可）" : "過去の記録を閲覧中"}
+          {isSharedView
+            ? "共有された記録を閲覧中（編集不可）"
+            : isParticipant
+            ? "参加中 — スコア入力のみ可（ゴルフ場・プレイヤー名・設定はオーナーが管理）"
+            : "過去の記録を閲覧中"}
         </div>
       )}
 
@@ -635,13 +656,13 @@ export default function App() {
             value={courseName}
             onChange={e => setCourseName(e.target.value)}
             placeholder="ゴルフ場名を入力"
-            disabled={isReadOnly}
+            disabled={isSettingsLocked}
             style={{
               width: "100%", boxSizing: "border-box",
               padding: "6px 8px", textAlign: "left",
               background: "#1a2e1a", border: "1px solid #2a4a2a",
-              borderRadius: 6, color: isReadOnly ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-              marginBottom: 6, opacity: isReadOnly ? 0.7 : 1,
+              borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+              marginBottom: 6, opacity: isSettingsLocked ? 0.7 : 1,
             }}
           />
           <div style={{ textAlign: "right" }}>
@@ -658,13 +679,13 @@ export default function App() {
                 <input
                   value={names[i]}
                   onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
-                  disabled={isReadOnly}
+                  disabled={isSettingsLocked}
                   style={{
                     width: "100%", boxSizing: "border-box",
                     padding: "6px 2px", textAlign: "center",
                     background: "#1a2e1a", border: "1px solid #2a4a2a",
-                    borderRadius: 6, color: isReadOnly ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-                    opacity: isReadOnly ? 0.7 : 1,
+                    borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                    opacity: isSettingsLocked ? 0.7 : 1,
                   }}
                 />
               </div>
@@ -675,7 +696,7 @@ export default function App() {
         {/* 4人チーム分け */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isReadOnly ? "none" : "auto", opacity: isReadOnly ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
             {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
               const active = teamMode === id;
               let display = label;
@@ -706,7 +727,7 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isReadOnly ? "none" : "auto", opacity: isReadOnly ? 0.6 : 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
             {([
               { k: "birdieReverse" as const, l: "バーディー逆転" },
               { k: "truncate" as const, l: "1の位切捨て" },
@@ -984,7 +1005,8 @@ export default function App() {
                 コース名・プレイヤー名をすべて入力してください
               </div>
             )}
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+            {/* 招待・共有はオーナーのみ表示 */}
+            <div style={{ marginTop: 10, display: isParticipant ? "none" : "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
               <button
                 onClick={copyInviteLink}
                 style={{
