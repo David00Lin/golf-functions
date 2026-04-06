@@ -321,8 +321,8 @@ export default function App() {
       carry = 1;
       const pts = Array(4).fill(0);
       const x = Math.abs(diff) * mult;
-      if (diff < 0) { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
-      else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
+      if (diff < 0) { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
+      else           { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
   }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
@@ -360,9 +360,9 @@ export default function App() {
       const pts = Array(4).fill(0);
       const x = Math.abs(diff) * mult;
       if (diff > 0) {
-        tA.forEach(p => { pts[p] = -x; }); tB.forEach(p => { pts[p] = x; });
-      } else if (diff < 0) {
         tA.forEach(p => { pts[p] = x; }); tB.forEach(p => { pts[p] = -x; });
+      } else if (diff < 0) {
+        tA.forEach(p => { pts[p] = -x; }); tB.forEach(p => { pts[p] = x; });
       }
       return { tA, tB, scA, scB, diff, mult, tied: false, pts };
     });
@@ -393,8 +393,8 @@ export default function App() {
     const debtors:   { idx: number; amount: number }[] = [];
     const creditors: { idx: number; amount: number }[] = [];
     for (let i = 0; i < n; i++) {
-      if (totals[i] > 0) debtors.push({ idx: i, amount: totals[i] });
-      else if (totals[i] < 0) creditors.push({ idx: i, amount: -totals[i] });
+      if (totals[i] < 0) debtors.push({ idx: i, amount: -totals[i] });
+      else if (totals[i] > 0) creditors.push({ idx: i, amount: totals[i] });
     }
     debtors.sort((a, b) => b.amount - a.amount);
     creditors.sort((a, b) => b.amount - a.amount);
@@ -942,14 +942,14 @@ export default function App() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span style={{
-                      fontSize: 13, color: GOLD, fontWeight: "bold",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
-                    }}>{names[tx.to]}</span>
-                    <span style={{ fontSize: 14, color: "#3a6a3a", flexShrink: 0 }}>←</span>
-                    <span style={{
                       fontSize: 13, color: RED, fontWeight: "bold",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
                     }}>{names[tx.from]}</span>
+                    <span style={{ fontSize: 14, color: "#3a6a3a", flexShrink: 0 }}>→</span>
+                    <span style={{
+                      fontSize: 13, color: GOLD, fontWeight: "bold",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
+                    }}>{names[tx.to]}</span>
                   </div>
                   <span style={{ fontSize: 17, fontWeight: "bold", color: "#f5f0e8", flexShrink: 0 }}>
                     {tx.amount}
