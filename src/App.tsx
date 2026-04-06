@@ -859,7 +859,7 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "3px 3px", textAlign: "center",
                           fontSize: 12, fontWeight: "bold",
-                          color: pt > 0 ? RED : pt < 0 ? GREEN : DIM,
+                          color: pt > 0 ? GREEN : pt < 0 ? RED : DIM,
                         }}>
                           {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
                         </div>
@@ -891,7 +891,7 @@ export default function App() {
                       <div key={pi} style={{
                         ...cell, padding: "5px 3px", textAlign: "center",
                         fontSize: 13, fontWeight: "bold",
-                        color: pt > 0 ? RED : pt < 0 ? GOLD : DIM,
+                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
                       }}>
                         {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
                       </div>
@@ -916,7 +916,7 @@ export default function App() {
               <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
               <span style={{
                 fontSize: 20, fontWeight: "bold",
-                color: totals[pi] > 0 ? RED : totals[pi] < 0 ? GOLD : DIM,
+                color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
               }}>
                 {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
               </span>
@@ -942,14 +942,14 @@ export default function App() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span style={{
-                      fontSize: 13, color: RED, fontWeight: "bold",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
-                    }}>{names[tx.from]}</span>
-                    <span style={{ fontSize: 14, color: "#3a6a3a", flexShrink: 0 }}>→</span>
-                    <span style={{
                       fontSize: 13, color: GOLD, fontWeight: "bold",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
                     }}>{names[tx.to]}</span>
+                    <span style={{ fontSize: 14, color: "#3a6a3a", flexShrink: 0 }}>←</span>
+                    <span style={{
+                      fontSize: 13, color: RED, fontWeight: "bold",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
+                    }}>{names[tx.from]}</span>
                   </div>
                   <span style={{ fontSize: 17, fontWeight: "bold", color: "#f5f0e8", flexShrink: 0 }}>
                     {tx.amount}
