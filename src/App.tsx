@@ -340,8 +340,8 @@ export default function App() {
       let loA = Math.min(...sA), hiA = Math.max(...sA);
       let loB = Math.min(...sB), hiB = Math.max(...sB);
       if (opts.birdieReverse) {
-        if (sA.some(sc => sc < par)) [loA, hiA] = [hiA, loA];
-        if (sB.some(sc => sc < par)) [loB, hiB] = [hiB, loB];
+        if (sA.some(sc => sc < par)) [loB, hiB] = [hiB, loB]; // Aがバーディー → 相手Bの数字を逆転
+        if (sB.some(sc => sc < par)) [loA, hiA] = [hiA, loA]; // Bがバーディー → 相手Aの数字を逆転
       }
       let scA = loA * 10 + hiA;
       let scB = loB * 10 + hiB;
