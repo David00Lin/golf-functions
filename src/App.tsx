@@ -54,7 +54,7 @@ export default function App() {
   const [sessionDisplayDate, setSessionDisplayDate] = useState(
     new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
   );
-  const [, setSessionId] = useState(getSessionId());
+  const [sessionId, setSessionId] = useState(getSessionId());
   const [names, setNames] = useState(["Player1", "Player2", "Player3", "Player4"]);
   const [scores, setScores] = useState<string[][]>(() =>
     Array(HOLES).fill(null).map(() => Array(4).fill(""))
@@ -67,12 +67,56 @@ export default function App() {
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
+  const [isSharedView, setIsSharedView] = useState(false);
+  const isReadOnly = isViewing || isSharedView;
+  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [shareInput, setShareInput] = useState("");
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
-  // セッション復元
+  // セッション復元（URLパラメータ ?s= による参加 / ?c= による共有閲覧を含む）
   useEffect(() => {
-    const id = getSessionId();
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("s");
+    const ctoken = params.get("c");
+    window.history.replaceState({}, "", window.location.pathname);
+
+    if (ctoken) {
+      // 共有コード経由：閲覧専用モードで開く
+      supabase.from("share_tokens").select("session_id").eq("token", ctoken.toUpperCase()).single()
+        .then(({ data: tokenData }) => {
+          if (!tokenData) return;
+          return supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
+        })
+        .then((res) => {
+          if (!res || !res.data) return;
+          const data = res.data;
+          setMode(data.mode as 3 | 4);
+          setCourseName(data.course_name ?? "");
+          setNames(data.names);
+          setPars(data.pars);
+          setScores(data.scores);
+          setOpts(data.opts);
+          setTeamMode(data.team_mode);
+          setSessionDisplayDate(formatDate(data.updated_at));
+          setSavedSnapshot(JSON.stringify({
+            courseName: data.course_name ?? "",
+            names: data.names,
+            scores: data.scores,
+            opts: data.opts,
+            mode: data.mode,
+            teamMode: data.team_mode,
+          }));
+          setIsSharedView(true);
+        });
+      return;
+    }
+
+    if (sid) {
+      localStorage.setItem("golf_session_id", sid);
+      setSessionId(sid);
+    }
+    const id = sid ?? getSessionId();
     supabase.from("sessions").select("*").eq("id", id).single()
       .then(({ data }) => {
         if (!data) return;
@@ -94,6 +138,36 @@ export default function App() {
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime：他のデバイスからの更新を受信して state に反映
+  useEffect(() => {
+    const channel = supabase
+      .channel(`session-${sessionId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "sessions", filter: `id=eq.${sessionId}` },
+        (payload) => {
+          const d = payload.new as any;
+          setMode(d.mode as 3 | 4);
+          setCourseName(d.course_name ?? "");
+          setNames(d.names);
+          setPars(d.pars);
+          setScores(d.scores);
+          setOpts(d.opts);
+          setTeamMode(d.team_mode);
+          setSavedSnapshot(JSON.stringify({
+            courseName: d.course_name ?? "",
+            names: d.names,
+            scores: d.scores,
+            opts: d.opts,
+            mode: d.mode,
+            teamMode: d.team_mode,
+          }));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
@@ -167,6 +241,9 @@ export default function App() {
     setSavedSnapshot(null);
     setShowHistory(false);
     setViewingSessionId(null);
+    setIsSharedView(false);
+    setShareCode(null);
+    setShareInput("");
   }
 
   const n = mode;
@@ -348,6 +425,55 @@ export default function App() {
   const isDirty = savedSnapshot !== currentSnapshot;
 
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function generateShareToken(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字(0,O,1,I)を除外
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  }
+
+  async function issueShareCode() {
+    if (!canSave) return;
+    const token = generateShareToken();
+    await supabase.from("share_tokens").insert({ token, session_id: sessionId });
+    setShareCode(token);
+  }
+
+  async function openByShareCode() {
+    const token = shareInput.trim().toUpperCase();
+    if (token.length !== 6) return;
+    const { data: tokenData } = await supabase
+      .from("share_tokens").select("session_id").eq("token", token).single();
+    if (!tokenData) { alert("コードが見つかりません"); return; }
+    const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
+    if (!data) return;
+    setMode(data.mode as 3 | 4);
+    setCourseName(data.course_name ?? "");
+    setNames(data.names);
+    setPars(data.pars);
+    setScores(data.scores);
+    setOpts(data.opts);
+    setTeamMode(data.team_mode);
+    setSessionDisplayDate(formatDate(data.updated_at));
+    setSavedSnapshot(JSON.stringify({
+      courseName: data.course_name ?? "",
+      names: data.names,
+      scores: data.scores,
+      opts: data.opts,
+      mode: data.mode,
+      teamMode: data.team_mode,
+    }));
+    setIsSharedView(true);
+    setShareInput("");
+    setShowHistory(false);
+  }
+
+  async function copyInviteLink() {
+    const url = `${window.location.origin}${window.location.pathname}?s=${sessionId}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function saveSession() {
     if (!canSave || saving) return;
@@ -392,14 +518,14 @@ export default function App() {
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
           {([3, 4] as const).map(m => (
-            <button key={m} onClick={() => !isViewing && handleModeChange(m)} style={{
+            <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
               padding: "5px 22px", borderRadius: 20,
               border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
               background: mode === m ? "#2a1f00" : "transparent",
               color: mode === m ? GOLD : "#6b8b6b",
-              fontSize: 13, cursor: isViewing ? "default" : "pointer",
+              fontSize: 13, cursor: isReadOnly ? "default" : "pointer",
               fontWeight: mode === m ? "bold" : "normal",
-              opacity: isViewing ? 0.5 : 1,
+              opacity: isReadOnly ? 0.5 : 1,
             }}>{m}人</button>
           ))}
         </div>
@@ -427,13 +553,13 @@ export default function App() {
       </div>
 
       {/* 閲覧モードバナー */}
-      {isViewing && (
+      {(isViewing || isSharedView) && (
         <div style={{
           background: "#1a1000", borderBottom: `1px solid ${GOLD}`,
           padding: "6px 16px", textAlign: "center",
           fontSize: 11, color: GOLD, letterSpacing: 1,
         }}>
-          過去の記録を閲覧中
+          {isSharedView ? "共有された記録を閲覧中（編集不可）" : "過去の記録を閲覧中"}
         </div>
       )}
 
@@ -441,8 +567,34 @@ export default function App() {
       {showHistory && (
         <div style={{
           background: "#0a160a", borderBottom: "1px solid #2a4a2a",
-          maxHeight: 280, overflowY: "auto",
+          maxHeight: 320, overflowY: "auto",
         }}>
+          {/* 共有コード入力 */}
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #1a3a1a", display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              value={shareInput}
+              onChange={e => setShareInput(e.target.value.toUpperCase())}
+              placeholder="共有コード（6桁）"
+              maxLength={6}
+              style={{
+                flex: 1, padding: "6px 8px", borderRadius: 6,
+                background: "#1a2e1a", border: "1px solid #2a4a2a",
+                color: "#f5f0e8", fontSize: 13, outline: "none",
+                letterSpacing: 3, textAlign: "center",
+              }}
+            />
+            <button
+              onClick={openByShareCode}
+              disabled={shareInput.trim().length !== 6}
+              style={{
+                padding: "6px 14px", borderRadius: 6,
+                border: `1px solid ${shareInput.trim().length === 6 ? GOLD : "#2a4a2a"}`,
+                background: "transparent",
+                color: shareInput.trim().length === 6 ? GOLD : "#3a5a3a",
+                fontSize: 12, cursor: shareInput.trim().length === 6 ? "pointer" : "default",
+              }}
+            >開く</button>
+          </div>
           {historyList.length === 0 ? (
             <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>記録なし</div>
           ) : historyList.map(s => (
@@ -483,13 +635,13 @@ export default function App() {
             value={courseName}
             onChange={e => setCourseName(e.target.value)}
             placeholder="ゴルフ場名を入力"
-            disabled={isViewing}
+            disabled={isReadOnly}
             style={{
               width: "100%", boxSizing: "border-box",
               padding: "6px 8px", textAlign: "left",
               background: "#1a2e1a", border: "1px solid #2a4a2a",
-              borderRadius: 6, color: isViewing ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-              marginBottom: 6, opacity: isViewing ? 0.7 : 1,
+              borderRadius: 6, color: isReadOnly ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+              marginBottom: 6, opacity: isReadOnly ? 0.7 : 1,
             }}
           />
           <div style={{ textAlign: "right" }}>
@@ -506,13 +658,13 @@ export default function App() {
                 <input
                   value={names[i]}
                   onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
-                  disabled={isViewing}
+                  disabled={isReadOnly}
                   style={{
                     width: "100%", boxSizing: "border-box",
                     padding: "6px 2px", textAlign: "center",
                     background: "#1a2e1a", border: "1px solid #2a4a2a",
-                    borderRadius: 6, color: isViewing ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-                    opacity: isViewing ? 0.7 : 1,
+                    borderRadius: 6, color: isReadOnly ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                    opacity: isReadOnly ? 0.7 : 1,
                   }}
                 />
               </div>
@@ -523,7 +675,7 @@ export default function App() {
         {/* 4人チーム分け */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isReadOnly ? "none" : "auto", opacity: isReadOnly ? 0.6 : 1 }}>
             {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
               const active = teamMode === id;
               let display = label;
@@ -554,7 +706,7 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isReadOnly ? "none" : "auto", opacity: isReadOnly ? 0.6 : 1 }}>
             {([
               { k: "birdieReverse" as const, l: "バーディー逆転" },
               { k: "truncate" as const, l: "1の位切捨て" },
@@ -607,14 +759,14 @@ export default function App() {
                 }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 2px" }}>
                     <span style={{ fontSize: 11, fontWeight: "bold", color: GOLD }}>{h + 1}</span>
-                    <div style={{ display: "flex", gap: 1, marginTop: 2, pointerEvents: isViewing ? "none" : "auto" }}>
+                    <div style={{ display: "flex", gap: 1, marginTop: 2, pointerEvents: isReadOnly ? "none" : "auto" }}>
                       {[3, 4, 5].map(p => (
                         <button key={p} onClick={() => setPars(prev => prev.map((v, ph) => ph === h ? p : v))} style={{
                           padding: "1px 3px", fontSize: 7, borderRadius: 3,
                           border: `1px solid ${pars[h] === p ? GOLD : "#2a4a2a"}`,
                           background: pars[h] === p ? "#2a1f00" : "transparent",
                           color: pars[h] === p ? GOLD : "#4a6a4a",
-                          cursor: isViewing ? "default" : "pointer",
+                          cursor: isReadOnly ? "default" : "pointer",
                         }}>{p}</button>
                       ))}
                     </div>
@@ -622,7 +774,7 @@ export default function App() {
                       <select
                         value={pushCounts[h]}
                         onChange={e => setPushCounts(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
-                        disabled={isViewing}
+                        disabled={isReadOnly}
                         style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#1a2e1a", border: "1px solid #2a4a2a", color: GOLD }}
                       >
                         <option value={0}>P×0</option>
@@ -660,7 +812,7 @@ export default function App() {
                           value={sc}
                           onChange={e => setScore(h, pi, e.target.value)}
                           min={1} max={15}
-                          disabled={isViewing}
+                          disabled={isReadOnly}
                           style={{
                             width: "100%", boxSizing: "border-box",
                             padding: "7px 0", textAlign: "center",
@@ -670,7 +822,7 @@ export default function App() {
                             fontSize: 17, fontWeight: "bold",
                             color: scoreColor, outline: "none",
                             MozAppearance: "textfield",
-                            opacity: isViewing ? 0.8 : 1,
+                            opacity: isReadOnly ? 0.8 : 1,
                           } as React.CSSProperties}
                           placeholder="·"
                         />
@@ -796,9 +948,8 @@ export default function App() {
             : `4人版：${(TEAM_MODES_4.find(t => t.id === teamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
         </div>
 
-        {/* ゲームの保存ボタン */}
-        {/* 閲覧モード: このゲームを続けるボタン */}
-        {isViewing && (
+        {/* 閲覧モード（自分の履歴）: このゲームを続けるボタン */}
+        {isViewing && !isSharedView && (
           <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
             <button onClick={handleContinueSession} style={{
               padding: "10px 32px", borderRadius: 24,
@@ -811,8 +962,8 @@ export default function App() {
           </div>
         )}
 
-        {/* 通常モード: 保存ボタン */}
-        {!isViewing && (
+        {/* 通常モード: 保存ボタン + 招待 + 共有コード */}
+        {!isViewing && !isSharedView && (
           <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
             <button
               onClick={saveSession}
@@ -831,6 +982,40 @@ export default function App() {
             {!canSave && (
               <div style={{ fontSize: 9, color: "#3a5a3a", marginTop: 6 }}>
                 コース名・プレイヤー名をすべて入力してください
+              </div>
+            )}
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={copyInviteLink}
+                style={{
+                  padding: "6px 16px", borderRadius: 20,
+                  border: `1px solid ${copied ? GOLD : "#2a4a2a"}`,
+                  background: "transparent",
+                  color: copied ? GOLD : "#4a6a4a",
+                  fontSize: 11, cursor: "pointer", letterSpacing: 1,
+                }}
+              >
+                {copied ? "コピーしました" : "招待リンクをコピー"}
+              </button>
+              <button
+                onClick={issueShareCode}
+                disabled={!canSave}
+                style={{
+                  padding: "6px 16px", borderRadius: 20,
+                  border: `1px solid ${canSave ? "#2a4a6a" : "#2a3a2a"}`,
+                  background: "transparent",
+                  color: canSave ? "#4a7a9b" : "#3a4a3a",
+                  fontSize: 11, cursor: canSave ? "pointer" : "default", letterSpacing: 1,
+                }}
+              >
+                共有コードを発行
+              </button>
+            </div>
+            {shareCode && (
+              <div style={{ marginTop: 12, padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
+                <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>SHARE CODE</div>
+                <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{shareCode}</div>
+                <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>相手に伝えて「履歴」→コード入力で閲覧できます</div>
               </div>
             )}
           </div>
