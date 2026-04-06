@@ -321,8 +321,8 @@ export default function App() {
       carry = 1;
       const pts = Array(4).fill(0);
       const x = Math.abs(diff) * mult;
-      if (diff < 0) { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
-      else           { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
+      if (diff < 0) { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
+      else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
   }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
@@ -360,9 +360,9 @@ export default function App() {
       const pts = Array(4).fill(0);
       const x = Math.abs(diff) * mult;
       if (diff > 0) {
-        tA.forEach(p => { pts[p] = x; }); tB.forEach(p => { pts[p] = -x; });
-      } else if (diff < 0) {
         tA.forEach(p => { pts[p] = -x; }); tB.forEach(p => { pts[p] = x; });
+      } else if (diff < 0) {
+        tA.forEach(p => { pts[p] = x; }); tB.forEach(p => { pts[p] = -x; });
       }
       return { tA, tB, scA, scB, diff, mult, tied: false, pts };
     });
@@ -393,8 +393,8 @@ export default function App() {
     const debtors:   { idx: number; amount: number }[] = [];
     const creditors: { idx: number; amount: number }[] = [];
     for (let i = 0; i < n; i++) {
-      if (totals[i] < 0) debtors.push({ idx: i, amount: -totals[i] });
-      else if (totals[i] > 0) creditors.push({ idx: i, amount: totals[i] });
+      if (totals[i] > 0) debtors.push({ idx: i, amount: totals[i] });
+      else if (totals[i] < 0) creditors.push({ idx: i, amount: -totals[i] });
     }
     debtors.sort((a, b) => b.amount - a.amount);
     creditors.sort((a, b) => b.amount - a.amount);
@@ -859,7 +859,7 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "3px 3px", textAlign: "center",
                           fontSize: 12, fontWeight: "bold",
-                          color: pt > 0 ? GREEN : pt < 0 ? RED : DIM,
+                          color: pt > 0 ? RED : pt < 0 ? GREEN : DIM,
                         }}>
                           {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
                         </div>
@@ -891,7 +891,7 @@ export default function App() {
                       <div key={pi} style={{
                         ...cell, padding: "5px 3px", textAlign: "center",
                         fontSize: 13, fontWeight: "bold",
-                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                        color: pt > 0 ? RED : pt < 0 ? GOLD : DIM,
                       }}>
                         {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
                       </div>
@@ -916,7 +916,7 @@ export default function App() {
               <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
               <span style={{
                 fontSize: 20, fontWeight: "bold",
-                color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
+                color: totals[pi] > 0 ? RED : totals[pi] < 0 ? GOLD : DIM,
               }}>
                 {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
               </span>
