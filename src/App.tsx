@@ -71,28 +71,30 @@ export default function App() {
   const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
-  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
-  // セッション復元（URLパラメータ ?s= による参加 / ?c= による共有閲覧を含む）
+  // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sid = params.get("s");
     const ctoken = params.get("c");
     window.history.replaceState({}, "", window.location.pathname);
 
     if (ctoken) {
-      // 共有コード経由：閲覧専用モードで開く
-      supabase.from("share_tokens").select("session_id").eq("token", ctoken.toUpperCase()).single()
-        .then(({ data: tokenData }) => {
+      // コード経由：role に応じて参加者 or 閲覧専用モードで開く
+      supabase.from("share_tokens").select("session_id, role").eq("token", ctoken.toUpperCase()).single()
+        .then(async ({ data: tokenData }) => {
           if (!tokenData) return;
-          return supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
-        })
-        .then((res) => {
-          if (!res || !res.data) return;
-          const data = res.data;
+          const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
+          if (!data) return;
+          const snap = JSON.stringify({
+            courseName: data.course_name ?? "",
+            names: data.names, scores: data.scores,
+            opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+          });
           setMode(data.mode as 3 | 4);
           setCourseName(data.course_name ?? "");
           setNames(data.names);
@@ -101,25 +103,19 @@ export default function App() {
           setOpts(data.opts);
           setTeamMode(data.team_mode);
           setSessionDisplayDate(formatDate(data.updated_at));
-          setSavedSnapshot(JSON.stringify({
-            courseName: data.course_name ?? "",
-            names: data.names,
-            scores: data.scores,
-            opts: data.opts,
-            mode: data.mode,
-            teamMode: data.team_mode,
-          }));
-          setIsSharedView(true);
+          setSavedSnapshot(snap);
+          if (tokenData.role === "join") {
+            localStorage.setItem("golf_session_id", tokenData.session_id);
+            setSessionId(tokenData.session_id);
+            setIsParticipant(true);
+          } else {
+            setIsSharedView(true);
+          }
         });
       return;
     }
 
-    if (sid) {
-      localStorage.setItem("golf_session_id", sid);
-      setSessionId(sid);
-      setIsParticipant(true); // 招待リンク経由 = 参加者（設定変更不可）
-    }
-    const id = sid ?? getSessionId();
+    const id = getSessionId();
     supabase.from("sessions").select("*").eq("id", id).single()
       .then(({ data }) => {
         if (!data) return;
@@ -247,7 +243,8 @@ export default function App() {
     setViewingSessionId(null);
     setIsParticipant(false);
     setIsSharedView(false);
-    setShareCode(null);
+    setJoinCode(null);
+    setViewCode(null);
     setShareInput("");
   }
 
@@ -427,28 +424,35 @@ export default function App() {
   const isDirty = savedSnapshot !== currentSnapshot;
 
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   function generateShareToken(): string {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字(0,O,1,I)を除外
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   }
 
-  async function issueShareCode() {
-    if (!canSave) return;
+  // 再発行時は同一session_id・同一roleの既存コードを削除してから新規作成
+  async function issueCode(role: "join" | "view") {
+    if (!canSave || isDirty) return;
+    await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
     const token = generateShareToken();
-    await supabase.from("share_tokens").insert({ token, session_id: sessionId });
-    setShareCode(token);
+    await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
+    if (role === "join") setJoinCode(token);
+    else setViewCode(token);
   }
 
   async function openByShareCode() {
     const token = shareInput.trim().toUpperCase();
     if (token.length !== 6) return;
     const { data: tokenData } = await supabase
-      .from("share_tokens").select("session_id").eq("token", token).single();
+      .from("share_tokens").select("session_id, role").eq("token", token).single();
     if (!tokenData) { alert("コードが見つかりません"); return; }
     const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
     if (!data) return;
+    const snap = JSON.stringify({
+      courseName: data.course_name ?? "",
+      names: data.names, scores: data.scores,
+      opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+    });
     setMode(data.mode as 3 | 4);
     setCourseName(data.course_name ?? "");
     setNames(data.names);
@@ -457,24 +461,18 @@ export default function App() {
     setOpts(data.opts);
     setTeamMode(data.team_mode);
     setSessionDisplayDate(formatDate(data.updated_at));
-    setSavedSnapshot(JSON.stringify({
-      courseName: data.course_name ?? "",
-      names: data.names,
-      scores: data.scores,
-      opts: data.opts,
-      mode: data.mode,
-      teamMode: data.team_mode,
-    }));
-    setIsSharedView(true);
+    setSavedSnapshot(snap);
+    if (tokenData.role === "join") {
+      localStorage.setItem("golf_session_id", tokenData.session_id);
+      setSessionId(tokenData.session_id);
+      setIsParticipant(true);
+      setIsSharedView(false);
+    } else {
+      setIsSharedView(true);
+      setIsParticipant(false);
+    }
     setShareInput("");
     setShowHistory(false);
-  }
-
-  async function copyInviteLink() {
-    const url = `${window.location.origin}${window.location.pathname}?s=${sessionId}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   async function saveSession() {
@@ -1002,45 +1000,61 @@ export default function App() {
                 コース名・プレイヤー名をすべて入力してください
               </div>
             )}
-            {/* 招待・共有はオーナーのみ表示 */}
-            <div style={{ marginTop: 10, display: isParticipant ? "none" : "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-              {/* 招待リンク: 設定入力済み + 保存済みの場合のみ有効 */}
-              <button
-                onClick={copyInviteLink}
-                disabled={!canSave || isDirty}
-                title={isDirty ? "保存してから共有できます" : !canSave ? "コース名・プレイヤー名を入力してください" : ""}
-                style={{
-                  padding: "6px 16px", borderRadius: 20,
-                  border: `1px solid ${copied ? GOLD : (canSave && !isDirty) ? "#2a4a2a" : "#1a2a1a"}`,
-                  background: "transparent",
-                  color: copied ? GOLD : (canSave && !isDirty) ? "#4a6a4a" : "#2a3a2a",
-                  fontSize: 11, cursor: (canSave && !isDirty) ? "pointer" : "default", letterSpacing: 1,
-                  opacity: (canSave && !isDirty) ? 1 : 0.4,
-                }}
-              >
-                {copied ? "コピーしました" : "招待リンクをコピー"}
-              </button>
-              <button
-                onClick={issueShareCode}
-                disabled={!canSave || isDirty}
-                title={isDirty ? "保存してから共有できます" : !canSave ? "コース名・プレイヤー名を入力してください" : ""}
-                style={{
-                  padding: "6px 16px", borderRadius: 20,
-                  border: `1px solid ${(canSave && !isDirty) ? "#2a4a6a" : "#1a2a1a"}`,
-                  background: "transparent",
-                  color: (canSave && !isDirty) ? "#4a7a9b" : "#2a3a2a",
-                  fontSize: 11, cursor: (canSave && !isDirty) ? "pointer" : "default", letterSpacing: 1,
-                  opacity: (canSave && !isDirty) ? 1 : 0.4,
-                }}
-              >
-                共有コードを発行
-              </button>
-            </div>
-            {shareCode && (
-              <div style={{ marginTop: 12, padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
-                <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>SHARE CODE</div>
-                <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{shareCode}</div>
-                <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>相手に伝えて「履歴」→コード入力で閲覧できます</div>
+            {/* コード発行はオーナーのみ表示 */}
+            {!isParticipant && (() => {
+              const enabled = canSave && !isDirty;
+              const tip = isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力してください" : "";
+              return (
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => issueCode("join")}
+                    disabled={!enabled}
+                    title={tip}
+                    style={{
+                      padding: "6px 16px", borderRadius: 20,
+                      border: `1px solid ${enabled ? "#2a6a4a" : "#1a2a1a"}`,
+                      background: "transparent",
+                      color: enabled ? "#4a9b6b" : "#2a3a2a",
+                      fontSize: 11, cursor: enabled ? "pointer" : "default", letterSpacing: 1,
+                      opacity: enabled ? 1 : 0.4,
+                    }}
+                  >
+                    参加コードを発行
+                  </button>
+                  <button
+                    onClick={() => issueCode("view")}
+                    disabled={!enabled}
+                    title={tip}
+                    style={{
+                      padding: "6px 16px", borderRadius: 20,
+                      border: `1px solid ${enabled ? "#2a4a6a" : "#1a2a1a"}`,
+                      background: "transparent",
+                      color: enabled ? "#4a7a9b" : "#2a3a2a",
+                      fontSize: 11, cursor: enabled ? "pointer" : "default", letterSpacing: 1,
+                      opacity: enabled ? 1 : 0.4,
+                    }}
+                  >
+                    閲覧コードを発行
+                  </button>
+                </div>
+              );
+            })()}
+            {(joinCode || viewCode) && (
+              <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                {joinCode && (
+                  <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a6a4a", display: "inline-block" }}>
+                    <div style={{ fontSize: 9, color: "#4a9b6b", letterSpacing: 2, marginBottom: 4 }}>参加コード（スコア入力可）</div>
+                    <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{joinCode}</div>
+                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                  </div>
+                )}
+                {viewCode && (
+                  <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
+                    <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>閲覧コード（読み取り専用）</div>
+                    <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
+                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
