@@ -321,8 +321,8 @@ export default function App() {
       carry = 1;
       const pts = Array(4).fill(0);
       const x = Math.abs(diff) * mult;
-      if (diff < 0) { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
-      else           { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
+      if (diff < 0) { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
+      else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
   }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
