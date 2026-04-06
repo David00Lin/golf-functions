@@ -10,13 +10,20 @@ const GREEN = "#4a9b7f";
 const RED = "#f87171";
 const DIM = "#4a5a4a";
 
-const TEAM_MODES = [
+const TEAM_MODES_3 = [
+  { id: "order_1_23",  label: "打順\n1位 vs 2&3位" },
+  { id: "fixed_1_23",  label: "固定\n1 vs 2&3" },
+  { id: "fixed_2_13",  label: "固定\n2 vs 1&3" },
+  { id: "fixed_3_12",  label: "固定\n3 vs 1&2" },
+];
+
+const TEAM_MODES_4 = [
+  { id: "order_14_23", label: "打順\n1&4 vs 2&3" },
+  { id: "order_rotate",label: "打順\nローテ" },
+  { id: "bag_rotate",  label: "バッグ順\nローテ" },
   { id: "fixed_12_34", label: "固定\n1&2 vs 3&4" },
   { id: "fixed_13_24", label: "固定\n1&3 vs 2&4" },
   { id: "fixed_14_23", label: "固定\n1&4 vs 2&3" },
-  { id: "order_14_23", label: "打順\n1&4 vs 2&3" },
-  { id: "bag_rotate",  label: "バッグ順\nローテ" },
-  { id: "order_rotate",label: "打順\nローテ" },
 ];
 
 function getRotateTeams(h: number, indices: number[]): [number[], number[]] {
@@ -57,7 +64,7 @@ export default function App() {
     carry: false, birdieReverse: false, truncate: false, push: false,
   });
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
-  const [teamMode, setTeamMode] = useState("fixed_12_34");
+  const [teamMode, setTeamMode] = useState("order_1_23");
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
 
@@ -114,6 +121,12 @@ export default function App() {
     setShowHistory(false);
   }
 
+  // モード切り替え（teamMode をそのモードのデフォルトにリセット）
+  function handleModeChange(m: 3 | 4) {
+    setMode(m);
+    setTeamMode(m === 3 ? "order_1_23" : "order_14_23");
+  }
+
   // 閲覧中のゲームを継続する
   function handleContinueSession() {
     if (!viewingSessionId) return;
@@ -140,7 +153,7 @@ export default function App() {
     setPars(Array(HOLES).fill(4));
     setOpts({ carry: false, birdieReverse: false, truncate: false, push: false });
     setPushCounts(Array(HOLES).fill(0));
-    setTeamMode("fixed_12_34");
+    setTeamMode("order_1_23");
     setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
     setSavedSnapshot(null);
     setShowHistory(false);
@@ -191,8 +204,12 @@ export default function App() {
       const s = scores[h];
       if (s.slice(0, 3).some(v => v === "")) return null;
       const par = pars[h];
-      const solo = order[0];
-      const pair = [order[1], order[2]];
+      let solo: number;
+      let pair: number[];
+      if      (teamMode === "fixed_1_23") { solo = 0; pair = [1, 2]; }
+      else if (teamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
+      else if (teamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
+      else                                { solo = order[0]; pair = [order[1], order[2]]; } // order_1_23
       const ss = Number(s[solo]);
       const ps = pair.map(pi => Number(s[pi]));
       let soloTeam = ss * 11;
@@ -217,7 +234,7 @@ export default function App() {
       else           { pts[solo] = -x * 2; pair.forEach(p => { pts[p] = x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, opts, pushCounts, mode]);
+  }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
 
   const results4 = useMemo((): (Result4 | null)[] => {
     if (mode !== 4) return [];
@@ -343,7 +360,7 @@ export default function App() {
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
           {([3, 4] as const).map(m => (
-            <button key={m} onClick={() => !isViewing && setMode(m)} style={{
+            <button key={m} onClick={() => !isViewing && handleModeChange(m)} style={{
               padding: "5px 22px", borderRadius: 20,
               border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
               background: mode === m ? "#2a1f00" : "transparent",
@@ -463,34 +480,35 @@ export default function App() {
         </div>
 
         {/* 4人チーム分け */}
-        {mode === 4 && (
-          <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
-              {TEAM_MODES.map(({ id, label }) => {
-                const active = teamMode === id;
-                let display = label;
-                if (id === "fixed_12_34") display = `固定\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
-                if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
-                if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
-                return (
-                  <button key={id} onClick={() => setTeamMode(id)} style={{
-                    padding: "7px 4px", borderRadius: 8,
-                    border: `1.5px solid ${active ? GOLD : "#2a4a2a"}`,
-                    background: active ? "#2a1f00" : "transparent",
-                    color: active ? GOLD : "#6b8b6b",
-                    fontSize: 9, cursor: "pointer",
-                    fontWeight: active ? "bold" : "normal",
-                    whiteSpace: "pre-line", lineHeight: 1.4,
-                    textAlign: "center", height: "100%",
-                  }}>
-                    {display}
-                  </button>
-                );
-              })}
-            </div>
+        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
+          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isViewing ? "none" : "auto", opacity: isViewing ? 0.6 : 1 }}>
+            {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
+              const active = teamMode === id;
+              let display = label;
+              if (id === "fixed_1_23")  display = `固定\n${names[0]}\nvs\n${names[1]}&${names[2]}`;
+              if (id === "fixed_2_13")  display = `固定\n${names[1]}\nvs\n${names[0]}&${names[2]}`;
+              if (id === "fixed_3_12")  display = `固定\n${names[2]}\nvs\n${names[0]}&${names[1]}`;
+              if (id === "fixed_12_34") display = `固定\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
+              if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
+              if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
+              return (
+                <button key={id} onClick={() => setTeamMode(id)} style={{
+                  padding: "7px 4px", borderRadius: 8,
+                  border: `1.5px solid ${active ? GOLD : "#2a4a2a"}`,
+                  background: active ? "#2a1f00" : "transparent",
+                  color: active ? GOLD : "#6b8b6b",
+                  fontSize: 9, cursor: "pointer",
+                  fontWeight: active ? "bold" : "normal",
+                  whiteSpace: "pre-line", lineHeight: 1.4,
+                  textAlign: "center", height: "100%",
+                }}>
+                  {display}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
@@ -532,7 +550,12 @@ export default function App() {
           {Array(HOLES).fill(null).map((_, h) => {
             const r = results[h];
             const order = orders[h];
-            const soloIdx = mode === 3 ? order[0] : null;
+            const soloIdx = mode === 3
+              ? teamMode === "fixed_1_23" ? 0
+              : teamMode === "fixed_2_13" ? 1
+              : teamMode === "fixed_3_12" ? 2
+              : order[0]
+              : null;
             const [tA4] = mode === 4 ? getTeams4(h) : [[], []];
             return (
               <React.Fragment key={h}>
@@ -692,8 +715,8 @@ export default function App() {
 
         <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
-            ? "3人版：単独はペア各人と個別決済（方法A）• 打順=前H昇順"
-            : `4人版：${TEAM_MODES.find(t => t.id === teamMode)?.label.replace("\n", " ")}`}
+            ? `3人版：単独はペア各人と個別決済（方法A）• ${(TEAM_MODES_3.find(t => t.id === teamMode) ?? TEAM_MODES_3[0]).label.replace(/\n/g, " ")}`
+            : `4人版：${(TEAM_MODES_4.find(t => t.id === teamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
         </div>
 
         {/* ゲームの保存ボタン */}
