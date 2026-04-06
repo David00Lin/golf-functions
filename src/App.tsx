@@ -572,14 +572,30 @@ export default function App() {
         <div style={{
           background: isParticipant ? "#0a1a2a" : "#1a1000",
           borderBottom: `1px solid ${isParticipant ? "#2a4a6a" : GOLD}`,
-          padding: "6px 16px", textAlign: "center",
-          fontSize: 11, color: isParticipant ? "#4a9bdb" : GOLD, letterSpacing: 1,
+          padding: "8px 16px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
+          flexWrap: "wrap",
         }}>
-          {isSharedView
-            ? "共有された記録を閲覧中（編集不可）"
-            : isParticipant
-            ? "参加中 — スコア入力のみ可（ゴルフ場・プレイヤー名・設定はオーナーが管理）"
-            : "過去の記録を閲覧中"}
+          <span style={{
+            fontSize: 11, color: isParticipant ? "#4a9bdb" : GOLD, letterSpacing: 1,
+          }}>
+            {isSharedView
+              ? "共有された記録を閲覧中（編集不可）"
+              : isParticipant
+              ? "参加中 — スコア入力のみ可（ゴルフ場・プレイヤー名・設定はオーナーが管理）"
+              : "過去の記録を閲覧中"}
+          </span>
+          {isViewing && !isSharedView && (
+            <button onClick={handleContinueSession} style={{
+              padding: "5px 20px", borderRadius: 20,
+              border: `1.5px solid ${GOLD}`,
+              background: GOLD, color: "#1a1000",
+              fontSize: 12, cursor: "pointer", fontWeight: "bold", letterSpacing: 0.5,
+              whiteSpace: "nowrap",
+            }}>
+              このゲームを続ける
+            </button>
+          )}
         </div>
       )}
 
@@ -967,20 +983,6 @@ export default function App() {
             ? `3人版：単独はペア各人と個別決済（方法A）• ${(TEAM_MODES_3.find(t => t.id === teamMode) ?? TEAM_MODES_3[0]).label.replace(/\n/g, " ")}`
             : `4人版：${(TEAM_MODES_4.find(t => t.id === teamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
         </div>
-
-        {/* 閲覧モード（自分の履歴）: このゲームを続けるボタン */}
-        {isViewing && !isSharedView && (
-          <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
-            <button onClick={handleContinueSession} style={{
-              padding: "10px 32px", borderRadius: 24,
-              border: `1.5px solid ${GOLD}`,
-              background: "#2a1f00", color: GOLD,
-              fontSize: 13, cursor: "pointer", fontWeight: "bold", letterSpacing: 1,
-            }}>
-              このゲームを続ける
-            </button>
-          </div>
-        )}
 
         {/* 通常モード: 保存ボタン + 招待 + 共有コード */}
         {!isViewing && !isSharedView && (
