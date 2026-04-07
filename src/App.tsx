@@ -583,14 +583,13 @@ export default function App() {
     return 0;
   };
 
-  // ゼロサム計算: 各ホールの得点 = 自分の点数×n - そのホールの全割当点数合計
-  const calcOlympicHolePts = (row: (string | null)[], numPlayers: number): number[] =>
-    Array.from({ length: numPlayers }, (_, pi) => {
-      const myPt = MEDAL_PTS(row[pi]);
-      if (!myPt) return 0;
-      const total = row.slice(0, numPlayers).reduce((s, m) => s + MEDAL_PTS(m), 0);
-      return myPt * numPlayers - total;
-    });
+  // ゼロサム計算: 全員分のメダルが揃ったホールのみ計算（揃っていない場合は全員0）
+  const calcOlympicHolePts = (row: (string | null)[], numPlayers: number): number[] => {
+    const assigned = row.slice(0, numPlayers);
+    if (!assigned.every(m => m !== null)) return Array(numPlayers).fill(0);
+    const total = assigned.reduce((s, m) => s + MEDAL_PTS(m), 0);
+    return Array.from({ length: numPlayers }, (_, pi) => MEDAL_PTS(row[pi]) * numPlayers - total);
+  };
 
   const olympicHalf = useMemo(() =>
     Array.from({ length: 4 }, (_, pi) =>
@@ -1453,13 +1452,20 @@ export default function App() {
                     <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: "#3a5a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = r.pts[pi];
+                      const olPt = displayOpts.olympic ? calcOlympicHolePts(olympicMedals[h], n)[pi] : 0;
                       return (
                         <div key={pi} style={{
                           ...cell, padding: "3px 3px", textAlign: "center",
-                          fontSize: 12, fontWeight: "bold",
-                          color: pt > 0 ? GREEN : pt < 0 ? RED : DIM,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                         }}>
-                          {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
+                          <span style={{ fontSize: 12, fontWeight: "bold", color: pt > 0 ? GREEN : pt < 0 ? RED : DIM }}>
+                            {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
+                          </span>
+                          {olPt !== 0 && (
+                            <span style={{ fontSize: 8, fontWeight: "bold", color: olPt > 0 ? "#f5c842" : RED }}>
+                              {olPt > 0 ? `+${olPt}` : olPt}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
