@@ -134,6 +134,22 @@ export default function App() {
     if (backLabel)  tryAutofillPars(backLabel, 9);
   }, [courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // サイトアクセスログ記録（初回マウント時のみ）
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlParams = params.toString() || null;
+    fetch("https://api.ipify.org?format=json").catch(() => null)
+      .then(r => r ? r.json() : { ip: null })
+      .then(({ ip }) => {
+        supabase.from("site_access_logs").insert({
+          device_id: getDeviceId(),
+          ip_address: ip,
+          user_agent: navigator.userAgent,
+          url_params: urlParams,
+        });
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
