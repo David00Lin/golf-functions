@@ -583,20 +583,29 @@ export default function App() {
     return 0;
   };
 
+  // ゼロサム計算: 各ホールの得点 = 自分の点数×n - そのホールの全割当点数合計
+  const calcOlympicHolePts = (row: (string | null)[], numPlayers: number): number[] =>
+    Array.from({ length: numPlayers }, (_, pi) => {
+      const myPt = MEDAL_PTS(row[pi]);
+      if (!myPt) return 0;
+      const total = row.slice(0, numPlayers).reduce((s, m) => s + MEDAL_PTS(m), 0);
+      return myPt * numPlayers - total;
+    });
+
   const olympicHalf = useMemo(() =>
     Array.from({ length: 4 }, (_, pi) =>
-      olympicMedals.slice(0, 9).reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
-    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
+      olympicMedals.slice(0, 9).reduce((sum, row) => sum + calcOlympicHolePts(row, n)[pi], 0)
+    ), [olympicMedals, olympicPts, n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const olympicBack = useMemo(() =>
     Array.from({ length: 4 }, (_, pi) =>
-      olympicMedals.slice(9, 18).reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
-    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
+      olympicMedals.slice(9, 18).reduce((sum, row) => sum + calcOlympicHolePts(row, n)[pi], 0)
+    ), [olympicMedals, olympicPts, n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const olympicTotals = useMemo(() =>
     Array.from({ length: 4 }, (_, pi) =>
-      olympicMedals.reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
-    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
+      olympicMedals.reduce((sum, row) => sum + calcOlympicHolePts(row, n)[pi], 0)
+    ), [olympicMedals, olympicPts, n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 精算：誰が誰にいくら払うか（最小取引数）
   const settlement = useMemo(() => {
@@ -1264,7 +1273,9 @@ export default function App() {
             ))}
             {displayOpts.olympic && (
               <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: "1px solid #1a3a1a" }}>
-                <span style={{ fontSize: 8, color: "#6b8b6b" }}>点数設定{(isParticipant || isSharedView || isAdminMode) ? "（この端末のみ）" : ""}:</span>
+                <span style={{ fontSize: 8, color: "#6b8b6b" }}>
+                  点数設定{(isParticipant || isSharedView || isAdminMode) ? "（この端末のみ）" : ""}:
+                </span>
                 {([
                   { key: "gold" as const, l: "金", color: "#f5c842" },
                   { key: "silver" as const, l: "銀", color: "#b0b8c0" },
@@ -1456,17 +1467,23 @@ export default function App() {
                 )}
                 {displayOpts.olympic && olympicMedals[h].slice(0, n).some(m => m !== null) && (
                   <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#060d06" }}>
-                    <div style={{ padding: "2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL</div>
+                    <div style={{ padding: "2px", textAlign: "center", fontSize: 6, color: "#5a4a1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                      <span>OL</span>
+                      <span style={{ color: "#f5c842" }}>金{olympicPts.gold}</span>
+                      <span style={{ color: "#b0b8c0" }}>銀{olympicPts.silver}</span>
+                      <span style={{ color: "#cd7f32" }}>銅{olympicPts.bronze}</span>
+                      <span style={{ color: "#7a8a9a" }}>鉄{olympicPts.iron}</span>
+                    </div>
                     {Array.from({ length: n }, (_, pi) => {
                       const medal = olympicMedals[h][pi];
                       const medalColor = medal === "金" ? "#f5c842" : medal === "銀" ? "#b0b8c0" : medal === "銅" ? "#cd7f32" : medal === "鉄" ? "#7a8a9a" : DIM;
-                      const pt = MEDAL_PTS(medal);
+                      const pt = calcOlympicHolePts(olympicMedals[h], n)[pi];
                       return (
                         <div key={pi} style={{
                           ...cell, padding: "2px 3px", textAlign: "center",
-                          fontSize: 10, fontWeight: "bold", color: medalColor,
+                          fontSize: 10, fontWeight: "bold", color: pt > 0 ? medalColor : pt < 0 ? RED : DIM,
                         }}>
-                          {medal ? `${medal} +${pt}` : ""}
+                          {medal ? `${medal} ${pt > 0 ? `+${pt}` : pt}` : ""}
                         </div>
                       );
                     })}
