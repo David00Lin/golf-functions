@@ -67,6 +67,9 @@ export default function App() {
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [frontLabel, setFrontLabel] = useState("");
   const [backLabel, setBackLabel] = useState("");
+  const [courseSuggestions, setCourseSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [courseNameValid, setCourseNameValid] = useState(false);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
   const [isSharedView, setIsSharedView] = useState(false);
@@ -78,6 +81,25 @@ export default function App() {
   const [shareInput, setShareInput] = useState("");
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
+
+  // コース名サジェスト検索（300ms debounce）
+  useEffect(() => {
+    if (!courseName.trim() || courseNameValid || isSettingsLocked) {
+      setCourseSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("courses").select("name")
+        .ilike("name", `%${courseName.trim()}%`)
+        .limit(8);
+      const list = data?.map(d => d.name) ?? [];
+      setCourseSuggestions(list);
+      setShowSuggestions(list.length > 0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [courseName, courseNameValid, isSettingsLocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
@@ -101,6 +123,7 @@ export default function App() {
           setTeamMode(data.team_mode);
           setFrontLabel(data.front_label ?? "");
           setBackLabel(data.back_label ?? "");
+          setCourseNameValid(!!data.course_name);
           setSessionDisplayDate(formatDate(data.updated_at));
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
@@ -132,6 +155,7 @@ export default function App() {
         setTeamMode(data.team_mode);
         setFrontLabel(data.front_label ?? "");
         setBackLabel(data.back_label ?? "");
+        setCourseNameValid(!!data.course_name);
         setSessionDisplayDate(formatDate(data.updated_at));
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
@@ -160,6 +184,7 @@ export default function App() {
           setTeamMode(d.team_mode);
           setFrontLabel(d.front_label ?? "");
           setBackLabel(d.back_label ?? "");
+          setCourseNameValid(!!d.course_name);
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
             names: d.names, scores: d.scores,
@@ -187,6 +212,7 @@ export default function App() {
     setTeamMode(data.team_mode);
     setFrontLabel(data.front_label ?? "");
     setBackLabel(data.back_label ?? "");
+    setCourseNameValid(!!data.course_name);
     setSessionDisplayDate(formatDate(data.updated_at));
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
@@ -243,6 +269,8 @@ export default function App() {
     setTeamMode("order_1_23");
     setFrontLabel("");
     setBackLabel("");
+    setCourseNameValid(false);
+    setCourseSuggestions([]);
     setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
     setSavedSnapshot(null);
     setShowHistory(false);
@@ -427,7 +455,7 @@ export default function App() {
     scores.some(row => row.slice(0, n).some(s => s !== ""));
 
   const canSave = !isViewing &&
-    courseName.trim() !== "" &&
+    courseNameValid &&
     names.slice(0, n).every(name => name.trim() !== "");
 
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
@@ -713,19 +741,48 @@ export default function App() {
         {/* Course name */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>GOLF COURSE</div>
-          <input
-            value={courseName}
-            onChange={e => setCourseName(e.target.value)}
-            placeholder="ゴルフ場名を入力"
-            disabled={isSettingsLocked}
-            style={{
-              width: "100%", boxSizing: "border-box",
-              padding: "6px 8px", textAlign: "left",
-              background: "#1a2e1a", border: "1px solid #2a4a2a",
-              borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-              marginBottom: 6, opacity: isSettingsLocked ? 0.7 : 1,
-            }}
-          />
+          <div style={{ position: "relative", marginBottom: 4 }}>
+            <input
+              value={courseName}
+              onChange={e => { setCourseName(e.target.value); setCourseNameValid(false); }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onFocus={() => { if (courseSuggestions.length > 0) setShowSuggestions(true); }}
+              placeholder="ゴルフ場名を検索"
+              disabled={isSettingsLocked}
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "6px 8px", textAlign: "left",
+                background: "#1a2e1a",
+                border: `1px solid ${courseName && !courseNameValid ? RED : courseNameValid ? GOLD : "#2a4a2a"}`,
+                borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                opacity: isSettingsLocked ? 0.7 : 1,
+              }}
+            />
+            {showSuggestions && courseSuggestions.length > 0 && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 0,
+                background: "#0f1f0f", border: `1px solid ${GOLD}`,
+                borderRadius: 6, zIndex: 100, maxHeight: 200, overflowY: "auto",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.6)", marginTop: 2,
+              }}>
+                {courseSuggestions.map(name => (
+                  <div
+                    key={name}
+                    onMouseDown={() => { setCourseName(name); setCourseNameValid(true); setShowSuggestions(false); }}
+                    style={{
+                      padding: "8px 10px", fontSize: 12, cursor: "pointer",
+                      borderBottom: "1px solid #1a3a1a", color: "#f5f0e8",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#1a3a1a")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >{name}</div>
+                ))}
+              </div>
+            )}
+          </div>
+          {courseName && !courseNameValid && (
+            <div style={{ fontSize: 9, color: RED, marginBottom: 4 }}>登録されていないゴルフ場です</div>
+          )}
           <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
           </div>
