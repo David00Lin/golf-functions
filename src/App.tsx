@@ -126,17 +126,12 @@ export default function App() {
     }
   }
 
-  // 前半ラベル確定時に前半9H par を自動入力
+  // コース名が確定したとき、既に選択済みのラベルがあればpar自動入力
   useEffect(() => {
-    if (!courseNameValid || !frontLabel || isReadOnly) return;
-    tryAutofillPars(frontLabel, 0);
-  }, [frontLabel, courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 後半ラベル確定時に後半9H par を自動入力
-  useEffect(() => {
-    if (!courseNameValid || !backLabel || isReadOnly) return;
-    tryAutofillPars(backLabel, 9);
-  }, [backLabel, courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!courseNameValid || isReadOnly) return;
+    if (frontLabel) tryAutofillPars(frontLabel, 0);
+    if (backLabel)  tryAutofillPars(backLabel, 9);
+  }, [courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
