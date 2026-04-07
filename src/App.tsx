@@ -49,7 +49,7 @@ function formatDate(iso: string) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<3 | 4>(3);
+  const [mode, setMode] = useState<3 | 4>(4);
   const [courseName, setCourseName] = useState("");
   const [sessionDisplayDate, setSessionDisplayDate] = useState(
     new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
@@ -529,7 +529,35 @@ export default function App() {
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
+        {/* ハンバーガーメニュー */}
+        <button style={{
+          position: "absolute", top: 14, right: 12,
+          background: "transparent", border: "none",
+          color: GOLD, fontSize: 20, cursor: "pointer",
+          lineHeight: 1, padding: "2px 4px",
+        }}>☰</button>
+        {/* 新ゲーム・履歴ボタン */}
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+          <button
+            onClick={handleNewSession}
+            disabled={!hasAnyInput}
+            style={{
+              padding: "4px 10px", borderRadius: 12,
+              border: `1px solid ${hasAnyInput ? "#4a6a4a" : "#2a3a2a"}`,
+              background: "transparent",
+              color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
+              fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
+            }}>新ゲーム</button>
+          <button onClick={toggleHistory} style={{
+            padding: "4px 10px", borderRadius: 12,
+            border: `1px solid ${showHistory ? GOLD : "#2a4a2a"}`,
+            background: showHistory ? "#2a1f00" : "transparent",
+            color: showHistory ? GOLD : "#6b8b6b",
+            fontSize: 10, cursor: "pointer",
+          }}>履歴</button>
+        </div>
+        {/* 人数切替ボタン */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 8 }}>
           {isParticipant ? (
             // 参加者: オーナーが設定した人数のみ表示（切り替え不可）
             <div style={{
@@ -553,27 +581,6 @@ export default function App() {
             ))
           )}
         </div>
-        {/* 履歴ボタン */}
-        <button onClick={toggleHistory} style={{
-          position: "absolute", top: 16, right: 12,
-          padding: "4px 10px", borderRadius: 12,
-          border: `1px solid ${showHistory ? GOLD : "#2a4a2a"}`,
-          background: showHistory ? "#2a1f00" : "transparent",
-          color: showHistory ? GOLD : "#6b8b6b",
-          fontSize: 10, cursor: "pointer",
-        }}>履歴</button>
-        {/* 新しいゲームボタン */}
-        <button
-          onClick={handleNewSession}
-          disabled={!hasAnyInput}
-          style={{
-            position: "absolute", top: 16, left: 12,
-            padding: "4px 10px", borderRadius: 12,
-            border: `1px solid ${hasAnyInput ? "#4a6a4a" : "#2a3a2a"}`,
-            background: "transparent",
-            color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
-            fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
-          }}>新ゲーム</button>
       </div>
 
       {/* バナー */}
