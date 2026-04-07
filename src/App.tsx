@@ -661,9 +661,12 @@ export default function App() {
         }
         if (course) {
           const deviceId = getDeviceId();
+          const isAllFour = (p: number[]) => p.every(v => v === 4);
           const submissions = [];
-          if (frontLabel) submissions.push({ course_id: course.id, label: frontLabel, pars: pars.slice(0, 9), device_id: deviceId });
-          if (backLabel)  submissions.push({ course_id: course.id, label: backLabel,  pars: pars.slice(9, 18), device_id: deviceId });
+          const frontPars = pars.slice(0, 9);
+          const backPars  = pars.slice(9, 18);
+          if (frontLabel && !isAllFour(frontPars)) submissions.push({ course_id: course.id, label: frontLabel, pars: frontPars, device_id: deviceId });
+          if (backLabel  && !isAllFour(backPars))  submissions.push({ course_id: course.id, label: backLabel,  pars: backPars,  device_id: deviceId });
           for (const s of submissions) {
             await supabase.from("course_sections").upsert(s, { onConflict: "course_id,label,device_id" });
           }
