@@ -66,6 +66,7 @@ export default function App() {
     carry: false, birdieReverse: false, truncate: false, push: false,
   });
   const [localOpts, setLocalOpts] = useState<Opts | null>(null);
+  const [localTeamMode, setLocalTeamMode] = useState<string | null>(null);
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [frontLabel, setFrontLabel] = useState("");
@@ -80,8 +81,9 @@ export default function App() {
   const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
-  // 参加者・閲覧者はオプションをローカルのみ変更可（DB非反映）
+  // 参加者・閲覧者はオプション・チーム分けをローカルのみ変更可（DB非反映）
   const displayOpts = (isParticipant || isSharedView) && localOpts !== null ? localOpts : opts;
+  const displayTeamMode = (isParticipant || isSharedView) && localTeamMode !== null ? localTeamMode : teamMode;
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [joinCodeExpiresAt, setJoinCodeExpiresAt] = useState<string | null>(null);
   const [viewCode, setViewCode] = useState<string | null>(null);
@@ -334,6 +336,7 @@ export default function App() {
     setSessionId(viewingSessionId);
     setViewingSessionId(null);
     setLocalOpts(null);
+    setLocalTeamMode(null);
     // savedSnapshot は loadSessionById で設定済み → isDirty=false（保存済み扱い）
   }
 
@@ -408,7 +411,7 @@ export default function App() {
 
   const getTeams4 = (h: number): [number[], number[]] => {
     const order = orders[h];
-    switch (teamMode) {
+    switch (displayTeamMode) {
       case "fixed_12_34": return [[0, 1], [2, 3]];
       case "fixed_13_24": return [[0, 2], [1, 3]];
       case "fixed_14_23": return [[0, 3], [1, 2]];
@@ -428,10 +431,10 @@ export default function App() {
       const par = pars[h];
       let solo: number;
       let pair: number[];
-      if      (teamMode === "fixed_1_23") { solo = 0; pair = [1, 2]; }
-      else if (teamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
-      else if (teamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
-      else                                { solo = order[0]; pair = [order[1], order[2]]; } // order_1_23
+      if      (displayTeamMode === "fixed_1_23") { solo = 0; pair = [1, 2]; }
+      else if (displayTeamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
+      else if (displayTeamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
+      else                                        { solo = order[0]; pair = [order[1], order[2]]; } // order_1_23
       const ss = Number(s[solo]);
       const ps = pair.map(pi => Number(s[pi]));
       let soloTeam = ss * 11;
@@ -456,7 +459,7 @@ export default function App() {
       else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, displayOpts, pushCounts, mode, teamMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results4 = useMemo((): (Result4 | null)[] => {
     if (mode !== 4) return [];
@@ -497,7 +500,7 @@ export default function App() {
       }
       return { tA, tB, scA, scB, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, displayOpts, pushCounts, mode, teamMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results: Result[] = mode === 3 ? results3 : results4;
 
@@ -674,6 +677,7 @@ export default function App() {
       setIsParticipant(false);
     }
     setLocalOpts(null);
+    setLocalTeamMode(null);
     setShareInput("");
     setShowHistory(false);
 
@@ -1058,9 +1062,12 @@ export default function App() {
         {/* 4人チーム分け */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
+          {(isParticipant || isSharedView) && (
+            <div style={{ fontSize: 8, color: "#4a7a4a", marginBottom: 4, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView) ? 0.6 : 1 }}>
             {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
-              const active = teamMode === id;
+              const active = displayTeamMode === id;
               let display = label;
               if (id === "fixed_1_23")  display = `固定\n${names[0]}\nvs\n${names[1]}&${names[2]}`;
               if (id === "fixed_2_13")  display = `固定\n${names[1]}\nvs\n${names[0]}&${names[2]}`;
@@ -1069,7 +1076,10 @@ export default function App() {
               if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
               if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
               return (
-                <button key={id} onClick={() => setTeamMode(id)} style={{
+                <button key={id} onClick={() => {
+                  if (isParticipant || isSharedView) setLocalTeamMode(id);
+                  else setTeamMode(id);
+                }} style={{
                   padding: "7px 4px", borderRadius: 8,
                   border: `1.5px solid ${active ? GOLD : "#2a4a2a"}`,
                   background: active ? "#2a1f00" : "transparent",
@@ -1136,9 +1146,9 @@ export default function App() {
             const r = results[h];
             const order = orders[h];
             const soloIdx = mode === 3
-              ? teamMode === "fixed_1_23" ? 0
-              : teamMode === "fixed_2_13" ? 1
-              : teamMode === "fixed_3_12" ? 2
+              ? displayTeamMode === "fixed_1_23" ? 0
+              : displayTeamMode === "fixed_2_13" ? 1
+              : displayTeamMode === "fixed_3_12" ? 2
               : order[0]
               : null;
             const [tA4] = mode === 4 ? getTeams4(h) : [[], []];
@@ -1386,8 +1396,8 @@ export default function App() {
 
         <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
-            ? `3人版：単独はペア各人と個別決済（方法A）• ${(TEAM_MODES_3.find(t => t.id === teamMode) ?? TEAM_MODES_3[0]).label.replace(/\n/g, " ")}`
-            : `4人版：${(TEAM_MODES_4.find(t => t.id === teamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
+            ? `3人版：単独はペア各人と個別決済（方法A）• ${(TEAM_MODES_3.find(t => t.id === displayTeamMode) ?? TEAM_MODES_3[0]).label.replace(/\n/g, " ")}`
+            : `4人版：${(TEAM_MODES_4.find(t => t.id === displayTeamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
         </div>
 
         {/* 通常モード: 保存ボタン + 招待 + 共有コード */}
