@@ -1262,9 +1262,9 @@ export default function App() {
                 fontWeight: displayOpts[k] ? "bold" : "normal",
               }}>{l}</button>
             ))}
-            {displayOpts.olympic && !isParticipant && !isSharedView && !isAdminMode && (
+            {displayOpts.olympic && (
               <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: "1px solid #1a3a1a" }}>
-                <span style={{ fontSize: 8, color: "#6b8b6b" }}>点数設定:</span>
+                <span style={{ fontSize: 8, color: "#6b8b6b" }}>点数設定{(isParticipant || isSharedView || isAdminMode) ? "（この端末のみ）" : ""}:</span>
                 {([
                   { key: "gold" as const, l: "金", color: "#f5c842" },
                   { key: "silver" as const, l: "銀", color: "#b0b8c0" },
@@ -1407,7 +1407,6 @@ export default function App() {
                                   <button
                                     key={m}
                                     onClick={() => {
-                                      if (isReadOnly) return;
                                       setOlympicMedals(prev => prev.map((row, rh) =>
                                         rh === h ? row.map((v, rp) => rp === pi ? (v === m ? null : m) : v) : row
                                       ));
