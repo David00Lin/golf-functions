@@ -1280,7 +1280,7 @@ export default function App() {
                   { key: "silver" as const, l: "銀", color: "#b0b8c0" },
                   { key: "bronze" as const, l: "銅", color: "#cd7f32" },
                   { key: "iron" as const, l: "鉄", color: "#7a8a9a" },
-                ]).map(({ key, l, color }) => (
+                ]).filter(({ l }) => !(n === 3 && l === "鉄")).map(({ key, l, color }) => (
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <span style={{ fontSize: 9, color }}>{l}</span>
                     <input
@@ -1411,7 +1411,7 @@ export default function App() {
                                 { m: "銀", color: "#b0b8c0" },
                                 { m: "銅", color: "#cd7f32" },
                                 { m: "鉄", color: "#7a8a9a" },
-                              ]).map(({ m, color }) => {
+                              ]).filter(({ m }) => !(n === 3 && m === "鉄")).map(({ m, color }) => {
                                 const selected = olympicMedals[h][pi] === m;
                                 const takenByOther = !selected && olympicMedals[h].some((v, rp) => rp !== pi && v === m);
                                 return (
