@@ -84,8 +84,8 @@ export default function App() {
   // 参加者・閲覧者はオプション・チーム分けをローカルのみ変更可（DB非反映）
   const displayOpts = (isParticipant || isSharedView) && localOpts !== null ? localOpts : opts;
   const displayTeamMode = (isParticipant || isSharedView) && localTeamMode !== null ? localTeamMode : teamMode;
-  const [joinCode, setJoinCode] = useState<string | null>(null);
-  const [joinCodeExpiresAt, setJoinCodeExpiresAt] = useState<string | null>(null);
+  const [playerTokens, setPlayerTokens] = useState<(string | null)[]>([null, null, null, null]);
+  const [playerTokenExpiresAt, setPlayerTokenExpiresAt] = useState<(string | null)[]>([null, null, null, null]);
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
   const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
@@ -260,20 +260,24 @@ export default function App() {
   useEffect(() => {
     if (isSharedView || isParticipant) return;
     const targetId = viewingSessionId ?? sessionId;
-    supabase.from("share_tokens").select("token, role, expires_at").eq("session_id", targetId)
+    supabase.from("share_tokens").select("token, role, expires_at, player_index").eq("session_id", targetId)
       .then(({ data }) => {
         if (!data) return;
-        setJoinCode(null); setJoinCodeExpiresAt(null); setViewCode(null);
+        const tokens: (string | null)[] = [null, null, null, null];
+        const expires: (string | null)[] = [null, null, null, null];
+        setViewCode(null);
         data.forEach(row => {
-          if (row.role === "join") {
+          if (row.role === "join" && row.player_index != null) {
             if (!row.expires_at || new Date(row.expires_at) > new Date()) {
-              setJoinCode(row.token);
-              setJoinCodeExpiresAt(row.expires_at ?? null);
+              tokens[row.player_index] = row.token;
+              expires[row.player_index] = row.expires_at ?? null;
             }
           } else if (row.role === "view") {
             setViewCode(row.token);
           }
         });
+        setPlayerTokens(tokens);
+        setPlayerTokenExpiresAt(expires);
       });
   }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -368,7 +372,8 @@ export default function App() {
     setViewingSessionId(null);
     setIsParticipant(false);
     setIsSharedView(false);
-    setJoinCode(null);
+    setPlayerTokens([null, null, null, null]);
+    setPlayerTokenExpiresAt([null, null, null, null]);
     setViewCode(null);
     setShareInput("");
   }
@@ -619,20 +624,42 @@ export default function App() {
     setViewCode(token);
   }
 
-  async function issueCode(role: "join" | "view") {
+  async function issueCode(role: "view") {
     if (!canSave || isDirty) return;
     const { data: existing } = await supabase
       .from("share_tokens").select("token").eq("session_id", sessionId).eq("role", role).maybeSingle();
     if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
     await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
     const token = generateShareToken();
-    const expiresAt = role === "join" ? new Date(Date.now() + 16 * 60 * 60 * 1000).toISOString() : null;
-    const record: Record<string, unknown> = { token, session_id: sessionId, role };
-    if (expiresAt) record.expires_at = expiresAt;
-    const { error } = await supabase.from("share_tokens").insert(record);
+    const { error } = await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
     if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
-    if (role === "join") { setJoinCode(token); setJoinCodeExpiresAt(expiresAt); }
-    else setViewCode(token);
+    setViewCode(token);
+  }
+
+  async function issuePlayerCode(playerIndex: number) {
+    if (!canSave || isDirty) return;
+    const { data: existing } = await supabase
+      .from("share_tokens").select("token")
+      .eq("session_id", sessionId).eq("role", "join").eq("player_index", playerIndex)
+      .maybeSingle();
+    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
+    await supabase.from("share_tokens").delete()
+      .eq("session_id", sessionId).eq("role", "join").eq("player_index", playerIndex);
+    const token = generateShareToken();
+    const expiresAt = new Date(Date.now() + 16 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from("share_tokens").insert({
+      token, session_id: sessionId, role: "join", player_index: playerIndex, expires_at: expiresAt,
+    });
+    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
+    setPlayerTokens(prev => prev.map((t, i) => i === playerIndex ? token : t));
+    setPlayerTokenExpiresAt(prev => prev.map((t, i) => i === playerIndex ? expiresAt : t));
+  }
+
+  async function deletePlayerCode(playerIndex: number) {
+    await supabase.from("share_tokens").delete()
+      .eq("session_id", sessionId).eq("role", "join").eq("player_index", playerIndex);
+    setPlayerTokens(prev => prev.map((t, i) => i === playerIndex ? null : t));
+    setPlayerTokenExpiresAt(prev => prev.map((t, i) => i === playerIndex ? null : t));
   }
 
   async function openByShareCode() {
@@ -1040,22 +1067,69 @@ export default function App() {
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>PLAYERS</div>
           <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>1H の打順に入力してください</div>
           <div style={{ display: "flex", gap: 6 }}>
-            {Array.from({ length: n }, (_, i) => (
-              <div key={i} style={{ flex: 1 }}>
-                <input
-                  value={names[i]}
-                  onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
-                  disabled={isSettingsLocked}
-                  style={{
-                    width: "100%", boxSizing: "border-box",
-                    padding: "6px 2px", textAlign: "center",
-                    background: "#1a2e1a", border: "1px solid #2a4a2a",
-                    borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-                    opacity: isSettingsLocked ? 0.7 : 1,
-                  }}
-                />
-              </div>
-            ))}
+            {Array.from({ length: n }, (_, i) => {
+              const token = playerTokens[i];
+              const expiresAt = playerTokenExpiresAt[i];
+              const canIssueCode = canSave && !isDirty;
+              return (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                  <input
+                    value={names[i]}
+                    onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
+                    disabled={isSettingsLocked}
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      padding: "6px 2px", textAlign: "center",
+                      background: "#1a2e1a", border: "1px solid #2a4a2a",
+                      borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                      opacity: isSettingsLocked ? 0.7 : 1,
+                    }}
+                  />
+                  {i > 0 && !isParticipant && !isSharedView && !isViewing && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                      {token ? (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
+                          {expiresAt && (
+                            <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
+                              {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}まで
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(token)}
+                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a6a4a", background: "transparent", color: "#4a9b6b", cursor: "pointer" }}
+                            >コピー</button>
+                            <button
+                              onClick={() => issuePlayerCode(i)}
+                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
+                            >再発行</button>
+                            <button
+                              onClick={() => deletePlayerCode(i)}
+                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer" }}
+                            >削除</button>
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => issuePlayerCode(i)}
+                          disabled={!canIssueCode}
+                          title={isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力" : ""}
+                          style={{
+                            width: "100%", padding: "3px 0", fontSize: 8, borderRadius: 4,
+                            border: `1px solid ${canIssueCode ? "#2a6a4a" : "#1a2a1a"}`,
+                            background: "transparent",
+                            color: canIssueCode ? "#4a9b6b" : "#2a3a2a",
+                            cursor: canIssueCode ? "pointer" : "default",
+                            opacity: canIssueCode ? 1 : 0.5,
+                          }}
+                        >コード発行</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1422,27 +1496,12 @@ export default function App() {
                 コース名・プレイヤー名をすべて入力してください
               </div>
             )}
-            {/* コード発行はオーナーのみ表示 */}
+            {/* 閲覧コード発行はオーナーのみ表示 */}
             {!isParticipant && (() => {
               const enabled = canSave && !isDirty;
               const tip = isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力してください" : "";
               return (
                 <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => issueCode("join")}
-                    disabled={!enabled}
-                    title={tip}
-                    style={{
-                      padding: "6px 16px", borderRadius: 20,
-                      border: `1px solid ${enabled ? "#2a6a4a" : "#1a2a1a"}`,
-                      background: "transparent",
-                      color: enabled ? "#4a9b6b" : "#2a3a2a",
-                      fontSize: 11, cursor: enabled ? "pointer" : "default", letterSpacing: 1,
-                      opacity: enabled ? 1 : 0.4,
-                    }}
-                  >
-                    参加コードを発行
-                  </button>
                   <button
                     onClick={() => issueCode("view")}
                     disabled={!enabled}
@@ -1461,27 +1520,13 @@ export default function App() {
                 </div>
               );
             })()}
-            {(joinCode || viewCode) && (
+            {viewCode && (
               <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                {joinCode && (
-                  <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a6a4a", display: "inline-block" }}>
-                    <div style={{ fontSize: 9, color: "#4a9b6b", letterSpacing: 2, marginBottom: 4 }}>参加コード（スコア入力可）</div>
-                    <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{joinCode}</div>
-                    {joinCodeExpiresAt && (
-                      <div style={{ fontSize: 9, color: "#c0a030", marginTop: 2 }}>
-                        有効期限: {new Date(joinCodeExpiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })} まで（16時間）
-                      </div>
-                    )}
-                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 2 }}>再発行すると旧コードは無効になります</div>
-                  </div>
-                )}
-                {viewCode && (
-                  <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
-                    <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>閲覧コード（読み取り専用）</div>
-                    <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
-                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
-                  </div>
-                )}
+                <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
+                  <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>閲覧コード（読み取り専用）</div>
+                  <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
+                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                </div>
               </div>
             )}
             {accessLogs.length > 0 && !isParticipant && !isSharedView && (() => {
