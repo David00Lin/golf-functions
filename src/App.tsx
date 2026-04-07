@@ -536,8 +536,10 @@ export default function App() {
           color: GOLD, fontSize: 20, cursor: "pointer",
           lineHeight: 1, padding: "2px 4px",
         }}>☰</button>
-        {/* 新ゲーム・履歴ボタン */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+        {/* セパレーター */}
+        <div style={{ borderTop: "1px solid #2a4a2a", marginTop: 10 }} />
+        {/* コントロール行: 新ゲーム | セグメント人数切替 | 履歴 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "0 4px" }}>
           <button
             onClick={handleNewSession}
             disabled={!hasAnyInput}
@@ -548,6 +550,28 @@ export default function App() {
               color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
               fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
             }}>新ゲーム</button>
+          {isParticipant ? (
+            <div style={{
+              padding: "3px 14px", borderRadius: 6,
+              border: `1px solid ${GOLD}`,
+              background: "#2a1f00", color: GOLD,
+              fontSize: 12, fontWeight: "bold",
+            }}>{mode}人</div>
+          ) : (
+            <div style={{ display: "inline-flex", border: "1px solid #2a4a2a", borderRadius: 8, overflow: "hidden", opacity: isReadOnly ? 0.5 : 1 }}>
+              {([3, 4] as const).map((m, i) => (
+                <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
+                  padding: "3px 16px",
+                  border: "none",
+                  borderRight: i === 0 ? "1px solid #2a4a2a" : "none",
+                  background: mode === m ? "#2a1f00" : "transparent",
+                  color: mode === m ? GOLD : "#6b8b6b",
+                  fontSize: 12, cursor: isReadOnly ? "default" : "pointer",
+                  fontWeight: mode === m ? "bold" : "normal",
+                }}>{m}人</button>
+              ))}
+            </div>
+          )}
           <button onClick={toggleHistory} style={{
             padding: "4px 10px", borderRadius: 12,
             border: `1px solid ${showHistory ? GOLD : "#2a4a2a"}`,
@@ -555,31 +579,6 @@ export default function App() {
             color: showHistory ? GOLD : "#6b8b6b",
             fontSize: 10, cursor: "pointer",
           }}>履歴</button>
-        </div>
-        {/* 人数切替ボタン */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 8 }}>
-          {isParticipant ? (
-            // 参加者: オーナーが設定した人数のみ表示（切り替え不可）
-            <div style={{
-              padding: "5px 22px", borderRadius: 20,
-              border: `1.5px solid ${GOLD}`,
-              background: "#2a1f00", color: GOLD,
-              fontSize: 13, fontWeight: "bold",
-            }}>{mode}人</div>
-          ) : (
-            // オーナー: 切り替えボタン表示
-            ([3, 4] as const).map(m => (
-              <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
-                padding: "5px 22px", borderRadius: 20,
-                border: `1.5px solid ${mode === m ? GOLD : "#2a4a2a"}`,
-                background: mode === m ? "#2a1f00" : "transparent",
-                color: mode === m ? GOLD : "#6b8b6b",
-                fontSize: 13, cursor: isReadOnly ? "default" : "pointer",
-                fontWeight: mode === m ? "bold" : "normal",
-                opacity: isReadOnly ? 0.5 : 1,
-              }}>{m}人</button>
-            ))
-          )}
         </div>
       </div>
 
