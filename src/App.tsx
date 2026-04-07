@@ -570,6 +570,11 @@ export default function App() {
     setShowHistory(false);
   }
 
+  async function handleSaveAndView() {
+    await saveSession();
+    setViewingSessionId(sessionId);
+  }
+
   async function saveSession() {
     if (!canSave || saving) return;
     setSaving(true);
@@ -1207,7 +1212,7 @@ export default function App() {
         {!isViewing && !isSharedView && (
           <div style={{ marginTop: 16, marginBottom: 24, textAlign: "center" }}>
             <button
-              onClick={saveSession}
+              onClick={handleSaveAndView}
               disabled={!canSave || saving}
               style={{
                 padding: "12px 40px", borderRadius: 24,
