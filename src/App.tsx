@@ -1443,7 +1443,6 @@ export default function App() {
                   </div>
                   <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>
                     最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP")}
-                    {last.ip_address && ` （${last.ip_address}）`}
                   </div>
                 </div>
               );
