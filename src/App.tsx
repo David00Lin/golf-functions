@@ -79,6 +79,7 @@ export default function App() {
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [joinCodeExpiresAt, setJoinCodeExpiresAt] = useState<string | null>(null);
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
 
@@ -145,9 +146,13 @@ export default function App() {
 
     if (ctoken) {
       // コード経由：role に応じて参加者 or 閲覧専用モードで開く
-      supabase.from("share_tokens").select("session_id, role").eq("token", ctoken.toUpperCase()).single()
+      supabase.from("share_tokens").select("session_id, role, expires_at").eq("token", ctoken.toUpperCase()).single()
         .then(async ({ data: tokenData }) => {
           if (!tokenData) return;
+          if (tokenData.role === "join" && tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+            alert("このコードは有効期限が切れています。再発行してもらってください。");
+            return;
+          }
           const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
           if (!data) return;
           setMode(data.mode as 3 | 4);
@@ -524,6 +529,9 @@ export default function App() {
   // 再発行時は同一session_id・同一roleの既存コードを削除してから新規作成
   async function issueViewCodeForViewing() {
     if (!viewingSessionId) return;
+    const { data: existing } = await supabase
+      .from("share_tokens").select("token").eq("session_id", viewingSessionId).eq("role", "view").maybeSingle();
+    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
     await supabase.from("share_tokens").delete().eq("session_id", viewingSessionId).eq("role", "view");
     const token = generateShareToken();
     const { error } = await supabase.from("share_tokens").insert({ token, session_id: viewingSessionId, role: "view" });
@@ -533,11 +541,17 @@ export default function App() {
 
   async function issueCode(role: "join" | "view") {
     if (!canSave || isDirty) return;
+    const { data: existing } = await supabase
+      .from("share_tokens").select("token").eq("session_id", sessionId).eq("role", role).maybeSingle();
+    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
     await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
     const token = generateShareToken();
-    const { error } = await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
+    const expiresAt = role === "join" ? new Date(Date.now() + 16 * 60 * 60 * 1000).toISOString() : null;
+    const record: Record<string, unknown> = { token, session_id: sessionId, role };
+    if (expiresAt) record.expires_at = expiresAt;
+    const { error } = await supabase.from("share_tokens").insert(record);
     if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
-    if (role === "join") setJoinCode(token);
+    if (role === "join") { setJoinCode(token); setJoinCodeExpiresAt(expiresAt); }
     else setViewCode(token);
   }
 
@@ -545,9 +559,13 @@ export default function App() {
     const token = shareInput.trim().toUpperCase();
     if (token.length !== 6) return;
     const { data: tokenData, error: tokenError } = await supabase
-      .from("share_tokens").select("session_id, role").eq("token", token).single();
+      .from("share_tokens").select("session_id, role, expires_at").eq("token", token).single();
     if (tokenError || !tokenData) {
       alert(tokenError ? `エラー: ${tokenError.message}` : "コードが見つかりません");
+      return;
+    }
+    if (tokenData.role === "join" && tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+      alert("このコードは有効期限が切れています。再発行してもらってください。");
       return;
     }
     const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
@@ -1301,7 +1319,12 @@ export default function App() {
                   <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a6a4a", display: "inline-block" }}>
                     <div style={{ fontSize: 9, color: "#4a9b6b", letterSpacing: 2, marginBottom: 4 }}>参加コード（スコア入力可）</div>
                     <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{joinCode}</div>
-                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                    {joinCodeExpiresAt && (
+                      <div style={{ fontSize: 9, color: "#c0a030", marginTop: 2 }}>
+                        有効期限: {new Date(joinCodeExpiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })} まで（16時間）
+                      </div>
+                    )}
+                    <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 2 }}>再発行すると旧コードは無効になります</div>
                   </div>
                 )}
                 {viewCode && (
