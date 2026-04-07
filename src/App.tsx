@@ -583,10 +583,10 @@ export default function App() {
     return 0;
   };
 
-  // ゼロサム計算: 全員分のメダルが揃ったホールのみ計算（揃っていない場合は全員0）
+  // ゼロサム計算: 未選択=0点として計算（1人以上選択されていれば計算開始）
   const calcOlympicHolePts = (row: (string | null)[], numPlayers: number): number[] => {
     const assigned = row.slice(0, numPlayers);
-    if (!assigned.every(m => m !== null)) return Array(numPlayers).fill(0);
+    if (!assigned.some(m => m !== null)) return Array(numPlayers).fill(0);
     const total = assigned.reduce((s, m) => s + MEDAL_PTS(m), 0);
     return Array.from({ length: numPlayers }, (_, pi) => MEDAL_PTS(row[pi]) * numPlayers - total);
   };
@@ -1404,42 +1404,53 @@ export default function App() {
                               opacity: isReadOnly ? 0.8 : 1,
                             }}
                           >{sc || "·"}</div>
-                          {displayOpts.olympic && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                              {([
-                                { m: "金", color: "#f5c842" },
-                                { m: "銀", color: "#b0b8c0" },
-                                { m: "銅", color: "#cd7f32" },
-                                { m: "鉄", color: "#7a8a9a" },
-                              ]).filter(({ m }) => !(n === 3 && m === "鉄")).map(({ m, color }) => {
-                                const selected = olympicMedals[h][pi] === m;
-                                const takenByOther = !selected && olympicMedals[h].some((v, rp) => rp !== pi && v === m);
-                                return (
-                                  <button
-                                    key={m}
-                                    disabled={takenByOther}
-                                    onClick={() => {
-                                      if (takenByOther) return;
-                                      setOlympicMedals(prev => prev.map((row, rh) =>
-                                        rh === h ? row.map((v, rp) => rp === pi ? (v === m ? null : m) : v) : row
-                                      ));
-                                    }}
-                                    style={{
-                                      padding: "1px 2px", fontSize: 7, lineHeight: 1,
-                                      borderRadius: 3,
-                                      border: `1px solid ${selected ? color : takenByOther ? "#1a2a1a" : "#2a4a2a"}`,
-                                      background: selected ? color + "33" : "transparent",
-                                      color: selected ? color : takenByOther ? "#2a3a2a" : "#3a5a3a",
-                                      cursor: takenByOther ? "default" : "pointer",
-                                      fontWeight: selected ? "bold" : "normal",
-                                      minWidth: 14,
-                                      opacity: takenByOther ? 0.35 : 1,
-                                    }}
-                                  >{m}</button>
-                                );
-                              })}
-                            </div>
-                          )}
+                          {displayOpts.olympic && (() => {
+                            const olPt = calcOlympicHolePts(olympicMedals[h], n)[pi];
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "center" }}>
+                                {([
+                                  { m: "金", color: "#f5c842" },
+                                  { m: "銀", color: "#b0b8c0" },
+                                  { m: "銅", color: "#cd7f32" },
+                                  { m: "鉄", color: "#7a8a9a" },
+                                ]).filter(({ m }) => !(n === 3 && m === "鉄")).map(({ m, color }) => {
+                                  const selected = olympicMedals[h][pi] === m;
+                                  const takenByOther = !selected && olympicMedals[h].some((v, rp) => rp !== pi && v === m);
+                                  return (
+                                    <button
+                                      key={m}
+                                      disabled={takenByOther}
+                                      onClick={() => {
+                                        if (takenByOther) return;
+                                        setOlympicMedals(prev => prev.map((row, rh) =>
+                                          rh === h ? row.map((v, rp) => rp === pi ? (v === m ? null : m) : v) : row
+                                        ));
+                                      }}
+                                      style={{
+                                        padding: "1px 2px", fontSize: 7, lineHeight: 1,
+                                        borderRadius: 3,
+                                        border: `1px solid ${selected ? color : takenByOther ? "#1a2a1a" : "#2a4a2a"}`,
+                                        background: selected ? color + "33" : "transparent",
+                                        color: selected ? color : takenByOther ? "#2a3a2a" : "#3a5a3a",
+                                        cursor: takenByOther ? "default" : "pointer",
+                                        fontWeight: selected ? "bold" : "normal",
+                                        minWidth: 14,
+                                        opacity: takenByOther ? 0.35 : 1,
+                                      }}
+                                    >{m}</button>
+                                  );
+                                })}
+                                {olPt !== 0 && (
+                                  <span style={{
+                                    fontSize: 8, fontWeight: "bold", lineHeight: 1, marginTop: 1,
+                                    color: olPt > 0 ? "#f5c842" : RED,
+                                  }}>
+                                    {olPt > 0 ? `+${olPt}` : olPt}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                         {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>単独</div>}
                       </div>
@@ -1452,20 +1463,13 @@ export default function App() {
                     <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: "#3a5a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = r.pts[pi];
-                      const olPt = displayOpts.olympic ? calcOlympicHolePts(olympicMedals[h], n)[pi] : 0;
                       return (
                         <div key={pi} style={{
                           ...cell, padding: "3px 3px", textAlign: "center",
-                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                          fontSize: 12, fontWeight: "bold",
+                          color: pt > 0 ? GREEN : pt < 0 ? RED : DIM,
                         }}>
-                          <span style={{ fontSize: 12, fontWeight: "bold", color: pt > 0 ? GREEN : pt < 0 ? RED : DIM }}>
-                            {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
-                          </span>
-                          {olPt !== 0 && (
-                            <span style={{ fontSize: 8, fontWeight: "bold", color: olPt > 0 ? "#f5c842" : RED }}>
-                              {olPt > 0 ? `+${olPt}` : olPt}
-                            </span>
-                          )}
+                          {pt > 0 ? `+${pt}` : pt === 0 ? "" : pt}
                         </div>
                       );
                     })}
