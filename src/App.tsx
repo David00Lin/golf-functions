@@ -550,10 +550,12 @@ export default function App() {
   const hasAnyInput = courseName.trim() !== "" ||
     scores.some(row => row.slice(0, n).some(s => s !== ""));
 
+  const filledHoles = scores.filter(row => row.slice(0, n).every(s => s !== "")).length;
   const canSave = !isViewing &&
     courseNameValid &&
     names.slice(0, n).every(name => name.trim() !== "") &&
-    !pars.every(v => v === 4);
+    !pars.every(v => v === 4) &&
+    filledHoles >= 3;
 
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
