@@ -1080,7 +1080,7 @@ export default function App() {
                   borderBottom: `2px solid ${GOLD}`,
                 }}>
                   <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 7 }}>後半</span>
+                    <span style={{ fontSize: 7 }}>{backLabel || "後半"}</span>
                     <span>計</span>
                   </div>
                   {Array.from({ length: n }, (_, pi) => {
