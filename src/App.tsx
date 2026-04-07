@@ -842,6 +842,22 @@ export default function App() {
               <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: "#f5f0e8" }}>{viewCode}</span>
             </div>
           )}
+          {isViewing && !isSharedView && accessLogs.length > 0 && (() => {
+            const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
+            const last = accessLogs[0];
+            return (
+              <div style={{ width: "100%", marginTop: 6, padding: "6px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
+                <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 3 }}>アクセス状況（オーナーのみ表示）</div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>総アクセス: <b style={{ color: GOLD }}>{accessLogs.length}</b> 回</span>
+                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>ユニーク: <b style={{ color: GOLD }}>{uniqueDevices}</b> 人</span>
+                </div>
+                <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 3 }}>
+                  最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP")}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
