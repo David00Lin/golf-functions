@@ -92,11 +92,6 @@ export default function App() {
           if (!tokenData) return;
           const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
           if (!data) return;
-          const snap = JSON.stringify({
-            courseName: data.course_name ?? "",
-            names: data.names, scores: data.scores,
-            opts: data.opts, mode: data.mode, teamMode: data.team_mode,
-          });
           setMode(data.mode as 3 | 4);
           setCourseName(data.course_name ?? "");
           setNames(data.names);
@@ -104,8 +99,15 @@ export default function App() {
           setScores(data.scores);
           setOpts(data.opts);
           setTeamMode(data.team_mode);
+          setFrontLabel(data.front_label ?? "");
+          setBackLabel(data.back_label ?? "");
           setSessionDisplayDate(formatDate(data.updated_at));
-          setSavedSnapshot(snap);
+          setSavedSnapshot(JSON.stringify({
+            courseName: data.course_name ?? "",
+            names: data.names, scores: data.scores,
+            opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+            frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
+          }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
             setSessionId(tokenData.session_id);
@@ -128,14 +130,14 @@ export default function App() {
         setScores(data.scores);
         setOpts(data.opts);
         setTeamMode(data.team_mode);
+        setFrontLabel(data.front_label ?? "");
+        setBackLabel(data.back_label ?? "");
         setSessionDisplayDate(formatDate(data.updated_at));
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
-          names: data.names,
-          scores: data.scores,
-          opts: data.opts,
-          mode: data.mode,
-          teamMode: data.team_mode,
+          names: data.names, scores: data.scores,
+          opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+          frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -156,13 +158,13 @@ export default function App() {
           setScores(d.scores);
           setOpts(d.opts);
           setTeamMode(d.team_mode);
+          setFrontLabel(d.front_label ?? "");
+          setBackLabel(d.back_label ?? "");
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
-            names: d.names,
-            scores: d.scores,
-            opts: d.opts,
-            mode: d.mode,
-            teamMode: d.team_mode,
+            names: d.names, scores: d.scores,
+            opts: d.opts, mode: d.mode, teamMode: d.team_mode,
+            frontLabel: d.front_label ?? "", backLabel: d.back_label ?? "",
           }));
         }
       )
@@ -183,14 +185,14 @@ export default function App() {
     setScores(data.scores);
     setOpts(data.opts);
     setTeamMode(data.team_mode);
+    setFrontLabel(data.front_label ?? "");
+    setBackLabel(data.back_label ?? "");
     setSessionDisplayDate(formatDate(data.updated_at));
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
-      names: data.names,
-      scores: data.scores,
-      opts: data.opts,
-      mode: data.mode,
-      teamMode: data.team_mode,
+      names: data.names, scores: data.scores,
+      opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+      frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -431,8 +433,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode }),
-    [courseName, names, scores, opts, mode, teamMode]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -507,9 +509,34 @@ export default function App() {
       scores,
       opts,
       totals,
+      front_label: frontLabel,
+      back_label: backLabel,
     });
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
+
+    // course_sections へ par データを投稿（best-effort）
+    if (courseName.trim()) {
+      try {
+        // courses: 同名コースがなければ insert（あれば select）
+        let { data: course } = await supabase
+          .from("courses").select("id").ilike("name", courseName.trim()).maybeSingle();
+        if (!course) {
+          const res = await supabase
+            .from("courses").insert({ name: courseName.trim() }).select("id").single();
+          course = res.data;
+        }
+        if (course) {
+          const deviceId = getDeviceId();
+          const submissions = [];
+          if (frontLabel) submissions.push({ course_id: course.id, label: frontLabel, pars: pars.slice(0, 9), device_id: deviceId });
+          if (backLabel)  submissions.push({ course_id: course.id, label: backLabel,  pars: pars.slice(9, 18), device_id: deviceId });
+          for (const s of submissions) {
+            await supabase.from("course_sections").upsert(s, { onConflict: "course_id,label,device_id" });
+          }
+        }
+      } catch (_) { /* best-effort */ }
+    }
   }
 
   // コース名・プレイヤー名が入力済みで未保存の場合は自動保存（スコア途中入力もDB同期）
@@ -707,8 +734,8 @@ export default function App() {
             {([["前半", frontLabel, setFrontLabel], ["後半", backLabel, setBackLabel]] as const).map(([half, label, setLabel], idx) => (
               <div key={half} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
                 <span style={{ fontSize: 9, color: "#6a8a6a", minWidth: 26 }}>{half}</span>
-                {(["Out", "In"] as const).map(v => (
-                  <button key={v} onClick={() => setLabel(v)} style={{
+                {(["In", "Out"] as const).map(v => (
+                  <button key={v} onClick={() => setLabel(label === v ? "" : v)} style={{
                     padding: "3px 8px", borderRadius: 10, fontSize: 10,
                     border: `1px solid ${label === v ? GOLD : "#2a4a2a"}`,
                     background: label === v ? "#2a1f00" : "transparent",
@@ -717,8 +744,9 @@ export default function App() {
                   }}>{v}</button>
                 ))}
                 <input
-                  value={label === "Out" || label === "In" ? "" : label}
+                  value={label === "In" || label === "Out" ? "" : label}
                   onChange={e => setLabel(e.target.value)}
+                  onFocus={() => { if (label === "In" || label === "Out") setLabel(""); }}
                   placeholder="自由記載"
                   style={{
                     flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
