@@ -531,7 +531,8 @@ export default function App() {
 
   const canSave = !isViewing &&
     courseNameValid &&
-    names.slice(0, n).every(name => name.trim() !== "");
+    names.slice(0, n).every(name => name.trim() !== "") &&
+    !pars.every(v => v === 4);
 
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
