@@ -1067,69 +1067,70 @@ export default function App() {
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>PLAYERS</div>
           <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>1H の打順に入力してください</div>
           <div style={{ display: "flex", gap: 6 }}>
-            {Array.from({ length: n }, (_, i) => {
-              const token = playerTokens[i];
-              const expiresAt = playerTokenExpiresAt[i];
-              const canIssueCode = canSave && !isDirty;
-              return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                  <input
-                    value={names[i]}
-                    onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
-                    disabled={isSettingsLocked}
-                    style={{
-                      width: "100%", boxSizing: "border-box",
-                      padding: "6px 2px", textAlign: "center",
-                      background: "#1a2e1a", border: "1px solid #2a4a2a",
-                      borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
-                      opacity: isSettingsLocked ? 0.7 : 1,
-                    }}
-                  />
-                  {i > 0 && !isParticipant && !isSharedView && !isViewing && (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                      {token ? (
-                        <>
-                          <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
-                          {expiresAt && (
-                            <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
-                              {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}まで
+            {(() => {
+              const issuedCount = playerTokens.slice(0, n).filter(t => t !== null).length;
+              const maxCodes = n - 1;
+              return Array.from({ length: n }, (_, i) => {
+                const token = playerTokens[i];
+                const expiresAt = playerTokenExpiresAt[i];
+                const canIssueCode = canSave && !isDirty && issuedCount < maxCodes;
+                return (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                    <input
+                      value={names[i]}
+                      onChange={e => setNames(names.map((x, j) => j === i ? e.target.value : x))}
+                      disabled={isSettingsLocked}
+                      style={{
+                        width: "100%", boxSizing: "border-box",
+                        padding: "6px 2px", textAlign: "center",
+                        background: "#1a2e1a", border: "1px solid #2a4a2a",
+                        borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                        opacity: isSettingsLocked ? 0.7 : 1,
+                      }}
+                    />
+                    {!isParticipant && !isSharedView && !isViewing && (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                        {token ? (
+                          <>
+                            <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
+                            {expiresAt && (
+                              <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
+                                {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}まで
+                              </div>
+                            )}
+                            <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(token)}
+                                style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a6a4a", background: "transparent", color: "#4a9b6b", cursor: "pointer" }}
+                              >コピー</button>
+                              <button
+                                onClick={() => issuePlayerCode(i)}
+                                style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
+                              >再発行</button>
+                              <button
+                                onClick={() => deletePlayerCode(i)}
+                                style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer" }}
+                              >削除</button>
                             </div>
-                          )}
-                          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(token)}
-                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a6a4a", background: "transparent", color: "#4a9b6b", cursor: "pointer" }}
-                            >コピー</button>
-                            <button
-                              onClick={() => issuePlayerCode(i)}
-                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
-                            >再発行</button>
-                            <button
-                              onClick={() => deletePlayerCode(i)}
-                              style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer" }}
-                            >削除</button>
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => issuePlayerCode(i)}
-                          disabled={!canIssueCode}
-                          title={isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力" : ""}
-                          style={{
-                            width: "100%", padding: "3px 0", fontSize: 8, borderRadius: 4,
-                            border: `1px solid ${canIssueCode ? "#2a6a4a" : "#1a2a1a"}`,
-                            background: "transparent",
-                            color: canIssueCode ? "#4a9b6b" : "#2a3a2a",
-                            cursor: canIssueCode ? "pointer" : "default",
-                            opacity: canIssueCode ? 1 : 0.5,
-                          }}
-                        >コード発行</button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                          </>
+                        ) : canIssueCode ? (
+                          <button
+                            onClick={() => issuePlayerCode(i)}
+                            title={isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力" : ""}
+                            style={{
+                              width: "100%", padding: "3px 0", fontSize: 8, borderRadius: 4,
+                              border: "1px solid #2a6a4a",
+                              background: "transparent", color: "#4a9b6b",
+                              cursor: "pointer",
+                            }}
+                          >コード発行</button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
 
