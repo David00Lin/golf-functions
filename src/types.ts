@@ -3,4 +3,5 @@ export interface Opts {
   birdieReverse: boolean;
   truncate: boolean;
   push: boolean;
+  olympic: boolean;
 }

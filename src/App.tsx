@@ -63,11 +63,15 @@ export default function App() {
   );
   const [pars, setPars] = useState<number[]>(Array(HOLES).fill(4));
   const [opts, setOpts] = useState<Opts>({
-    carry: false, birdieReverse: false, truncate: false, push: false,
+    carry: false, birdieReverse: false, truncate: false, push: false, olympic: false,
   });
   const [localOpts, setLocalOpts] = useState<Opts | null>(null);
   const [localTeamMode, setLocalTeamMode] = useState<string | null>(null);
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
+  const [olympicMedals, setOlympicMedals] = useState<(string | null)[][]>(
+    () => Array(HOLES).fill(null).map(() => Array(4).fill(null))
+  );
+  const [olympicPts, setOlympicPts] = useState({ gold: 5, silver: 3, bronze: 2, iron: 1 });
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [frontLabel, setFrontLabel] = useState("");
   const [backLabel, setBackLabel] = useState("");
@@ -363,7 +367,8 @@ export default function App() {
     setNames(["Player1", "Player2", "Player3", "Player4"]);
     setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setPars(Array(HOLES).fill(4));
-    setOpts({ carry: false, birdieReverse: false, truncate: false, push: false });
+    setOpts({ carry: false, birdieReverse: false, truncate: false, push: false, olympic: false });
+    setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
     setPushCounts(Array(HOLES).fill(0));
     setTeamMode("order_1_23");
     setFrontLabel("");
@@ -568,6 +573,30 @@ export default function App() {
       }, 0)
     );
   }, [scores]);
+
+  const MEDAL_PTS = (medal: string | null) => {
+    if (!medal) return 0;
+    if (medal === "金") return olympicPts.gold;
+    if (medal === "銀") return olympicPts.silver;
+    if (medal === "銅") return olympicPts.bronze;
+    if (medal === "鉄") return olympicPts.iron;
+    return 0;
+  };
+
+  const olympicHalf = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      olympicMedals.slice(0, 9).reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
+    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const olympicBack = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      olympicMedals.slice(9, 18).reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
+    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const olympicTotals = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      olympicMedals.reduce((sum, row) => sum + MEDAL_PTS(row[pi]), 0)
+    ), [olympicMedals, olympicPts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 精算：誰が誰にいくら払うか（最小取引数）
   const settlement = useMemo(() => {
@@ -1215,6 +1244,7 @@ export default function App() {
               { k: "truncate" as const, l: "1の位切捨て" },
               { k: "carry" as const, l: "キャリー" },
               { k: "push" as const, l: "プッシュ" },
+              { k: "olympic" as const, l: "オリンピック" },
             ]).map(({ k, l }) => (
               <button key={k} onClick={() => {
                 if (isParticipant || isSharedView || isAdminMode) {
@@ -1231,6 +1261,31 @@ export default function App() {
                 fontWeight: displayOpts[k] ? "bold" : "normal",
               }}>{l}</button>
             ))}
+            {displayOpts.olympic && !isParticipant && !isSharedView && !isAdminMode && (
+              <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: "1px solid #1a3a1a" }}>
+                <span style={{ fontSize: 8, color: "#6b8b6b" }}>点数設定:</span>
+                {([
+                  { key: "gold" as const, l: "金", color: "#f5c842" },
+                  { key: "silver" as const, l: "銀", color: "#b0b8c0" },
+                  { key: "bronze" as const, l: "銅", color: "#cd7f32" },
+                  { key: "iron" as const, l: "鉄", color: "#7a8a9a" },
+                ]).map(({ key, l, color }) => (
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: 9, color }}>{l}</span>
+                    <input
+                      type="number" min={0} max={99}
+                      value={olympicPts[key]}
+                      onChange={e => setOlympicPts(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                      style={{
+                        width: 32, padding: "2px 3px", fontSize: 10, textAlign: "center",
+                        background: "#1a2e1a", border: "1px solid #2a4a2a",
+                        borderRadius: 4, color: "#f5f0e8", outline: "none",
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1316,27 +1371,61 @@ export default function App() {
                             {isTeamA ? "A" : "B"}
                           </div>
                         )}
-                        <div
-                          onClick={() => { if (!isReadOnly) setActiveCell({ h, pi }); }}
-                          style={{
-                            width: "100%", boxSizing: "border-box",
-                            padding: "7px 0", textAlign: "center",
-                            background: activeCell?.h === h && activeCell?.pi === pi
-                              ? "rgba(200,169,110,0.15)" : "transparent",
-                            border: `1.5px solid ${
-                              activeCell?.h === h && activeCell?.pi === pi ? GOLD
-                              : isSolo ? "#3a2e00" : isTeamA ? "#2a2000" : "#1a3a2e"
-                            }`,
-                            borderRadius: 6,
-                            fontSize: 17, fontWeight: "bold",
-                            color: sc ? scoreColor : "#3a4a3a",
-                            cursor: isReadOnly ? "default" : "pointer",
-                            userSelect: "none",
-                            minHeight: 32, display: "flex",
-                            alignItems: "center", justifyContent: "center",
-                            opacity: isReadOnly ? 0.8 : 1,
-                          }}
-                        >{sc || "·"}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <div
+                            onClick={() => { if (!isReadOnly) setActiveCell({ h, pi }); }}
+                            style={{
+                              flex: 1, boxSizing: "border-box",
+                              padding: "7px 0", textAlign: "center",
+                              background: activeCell?.h === h && activeCell?.pi === pi
+                                ? "rgba(200,169,110,0.15)" : "transparent",
+                              border: `1.5px solid ${
+                                activeCell?.h === h && activeCell?.pi === pi ? GOLD
+                                : isSolo ? "#3a2e00" : isTeamA ? "#2a2000" : "#1a3a2e"
+                              }`,
+                              borderRadius: 6,
+                              fontSize: 17, fontWeight: "bold",
+                              color: sc ? scoreColor : "#3a4a3a",
+                              cursor: isReadOnly ? "default" : "pointer",
+                              userSelect: "none",
+                              minHeight: 32, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              opacity: isReadOnly ? 0.8 : 1,
+                            }}
+                          >{sc || "·"}</div>
+                          {displayOpts.olympic && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                              {([
+                                { m: "金", color: "#f5c842" },
+                                { m: "銀", color: "#b0b8c0" },
+                                { m: "銅", color: "#cd7f32" },
+                                { m: "鉄", color: "#7a8a9a" },
+                              ]).map(({ m, color }) => {
+                                const selected = olympicMedals[h][pi] === m;
+                                return (
+                                  <button
+                                    key={m}
+                                    onClick={() => {
+                                      if (isReadOnly) return;
+                                      setOlympicMedals(prev => prev.map((row, rh) =>
+                                        rh === h ? row.map((v, rp) => rp === pi ? (v === m ? null : m) : v) : row
+                                      ));
+                                    }}
+                                    style={{
+                                      padding: "1px 2px", fontSize: 7, lineHeight: 1,
+                                      borderRadius: 3, border: `1px solid ${selected ? color : "#2a4a2a"}`,
+                                      background: selected ? color + "33" : "transparent",
+                                      color: selected ? color : "#3a5a3a",
+                                      cursor: isReadOnly ? "default" : "pointer",
+                                      fontWeight: selected ? "bold" : "normal",
+                                      minWidth: 14,
+                                    }}
+                                  >{m}</button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>単独</div>}
                       </div>
                     );
@@ -1360,6 +1449,24 @@ export default function App() {
                     })}
                   </div>
                 )}
+                {displayOpts.olympic && olympicMedals[h].slice(0, n).some(m => m !== null) && (
+                  <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#060d06" }}>
+                    <div style={{ padding: "2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL</div>
+                    {Array.from({ length: n }, (_, pi) => {
+                      const medal = olympicMedals[h][pi];
+                      const medalColor = medal === "金" ? "#f5c842" : medal === "銀" ? "#b0b8c0" : medal === "銅" ? "#cd7f32" : medal === "鉄" ? "#7a8a9a" : DIM;
+                      const pt = MEDAL_PTS(medal);
+                      return (
+                        <div key={pi} style={{
+                          ...cell, padding: "2px 3px", textAlign: "center",
+                          fontSize: 10, fontWeight: "bold", color: medalColor,
+                        }}>
+                          {medal ? `${medal} +${pt}` : ""}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {r && r.tied && (
                   <div style={{ padding: "2px 8px", background: "#080f08", fontSize: 8, color: GOLD, textAlign: "center" }}>
                     引き分け → 次×{r.mult + 1}
@@ -1369,60 +1476,104 @@ export default function App() {
 
               {/* 後半小計（18H後） */}
               {h === 17 && (
-                <div style={{
-                  display: "grid", gridTemplateColumns: gridCols,
-                  background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
-                  borderBottom: `2px solid ${GOLD}`,
-                }}>
-                  <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 7 }}>{backLabel || "後半"}</span>
-                    <span>計</span>
+                <>
+                  <div style={{
+                    display: "grid", gridTemplateColumns: gridCols,
+                    background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
+                    borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
+                  }}>
+                    <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+                      <span style={{ fontSize: 7 }}>{backLabel || "後半"}</span>
+                      <span>計</span>
+                    </div>
+                    {Array.from({ length: n }, (_, pi) => {
+                      const pt = backTotals[pi];
+                      const gs = grossBack[pi];
+                      return (
+                        <div key={pi} style={{
+                          ...cell, padding: "5px 3px", textAlign: "center",
+                          fontSize: 13, fontWeight: "bold",
+                          color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                        }}>
+                          <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
+                          {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {Array.from({ length: n }, (_, pi) => {
-                    const pt = backTotals[pi];
-                    const gs = grossBack[pi];
-                    return (
-                      <div key={pi} style={{
-                        ...cell, padding: "5px 3px", textAlign: "center",
-                        fontSize: 13, fontWeight: "bold",
-                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
-                      }}>
-                        <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
-                        {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+                  {displayOpts.olympic && (
+                    <div style={{
+                      display: "grid", gridTemplateColumns: gridCols,
+                      background: "#090f09", borderBottom: `2px solid ${GOLD}`,
+                    }}>
+                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL計</div>
+                      {Array.from({ length: n }, (_, pi) => {
+                        const pt = olympicBack[pi];
+                        return (
+                          <div key={pi} style={{
+                            ...cell, padding: "3px 3px", textAlign: "center",
+                            fontSize: 11, fontWeight: "bold",
+                            color: pt > 0 ? "#f5c842" : DIM,
+                          }}>
+                            {pt > 0 ? `+${pt}` : "-"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* ハーフ小計（9H後） */}
               {h === 8 && (
-                <div style={{
-                  display: "grid", gridTemplateColumns: gridCols,
-                  background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
-                  borderBottom: `2px solid ${GOLD}`,
-                }}>
-                  <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 7 }}>{frontLabel || "前半"}</span>
-                    <span>計</span>
+                <>
+                  <div style={{
+                    display: "grid", gridTemplateColumns: gridCols,
+                    background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
+                    borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
+                  }}>
+                    <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+                      <span style={{ fontSize: 7 }}>{frontLabel || "前半"}</span>
+                      <span>計</span>
+                    </div>
+                    {Array.from({ length: n }, (_, pi) => {
+                      const pt = halfTotals[pi];
+                      const gs = grossHalf[pi];
+                      return (
+                        <div key={pi} style={{
+                          ...cell, padding: "5px 3px", textAlign: "center",
+                          fontSize: 13, fontWeight: "bold",
+                          color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                        }}>
+                          <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
+                          {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {Array.from({ length: n }, (_, pi) => {
-                    const pt = halfTotals[pi];
-                    const gs = grossHalf[pi];
-                    return (
-                      <div key={pi} style={{
-                        ...cell, padding: "5px 3px", textAlign: "center",
-                        fontSize: 13, fontWeight: "bold",
-                        color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
-                      }}>
-                        <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
-                        {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+                  {displayOpts.olympic && (
+                    <div style={{
+                      display: "grid", gridTemplateColumns: gridCols,
+                      background: "#090f09", borderBottom: `2px solid ${GOLD}`,
+                    }}>
+                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL計</div>
+                      {Array.from({ length: n }, (_, pi) => {
+                        const pt = olympicHalf[pi];
+                        return (
+                          <div key={pi} style={{
+                            ...cell, padding: "3px 3px", textAlign: "center",
+                            fontSize: 11, fontWeight: "bold",
+                            color: pt > 0 ? "#f5c842" : DIM,
+                          }}>
+                            {pt > 0 ? `+${pt}` : "-"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
               {h === 8 && backLabel && (
                 <div style={{
@@ -1450,17 +1601,24 @@ export default function App() {
               borderBottom: pi < n - 1 ? "1px solid #1a3a1a" : "none",
             }}>
               <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
-              <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-                <span style={{
-                  fontSize: 20, fontWeight: "bold",
-                  color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
-                }}>
-                  {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <span style={{
+                    fontSize: 20, fontWeight: "bold",
+                    color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
+                  }}>
+                    {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
+                  </span>
+                  {grossTotals[pi] > 0 && (
+                    <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>({grossTotals[pi]})</span>
+                  )}
                 </span>
-                {grossTotals[pi] > 0 && (
-                  <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>({grossTotals[pi]})</span>
+                {displayOpts.olympic && olympicTotals[pi] > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: "bold", color: "#f5c842" }}>
+                    OL +{olympicTotals[pi]}
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
           ))}
 
