@@ -82,6 +82,7 @@ export default function App() {
   const [joinCodeExpiresAt, setJoinCodeExpiresAt] = useState<string | null>(null);
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
+  const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
@@ -252,6 +253,15 @@ export default function App() {
           }
         });
       });
+  }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // オーナー用：アクセスログ取得
+  useEffect(() => {
+    if (isSharedView || isParticipant) return;
+    const targetId = viewingSessionId ?? sessionId;
+    supabase.from("share_access_logs").select("device_id, ip_address, accessed_at, role")
+      .eq("session_id", targetId).order("accessed_at", { ascending: false })
+      .then(({ data }) => { setAccessLogs(data ?? []); });
   }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 履歴から読み込み（閲覧モード）
@@ -644,6 +654,19 @@ export default function App() {
     }
     setShareInput("");
     setShowHistory(false);
+
+    // アクセスログを記録（best-effort）
+    try {
+      const ipRes = await fetch("https://api.ipify.org?format=json").catch(() => null);
+      const ip = ipRes ? (await ipRes.json()).ip : null;
+      await supabase.from("share_access_logs").insert({
+        session_id: tokenData.session_id,
+        token,
+        role: tokenData.role,
+        device_id: getDeviceId(),
+        ip_address: ip,
+      });
+    } catch (_) { /* best-effort */ }
   }
 
   async function handleSaveAndView() {
@@ -1404,6 +1427,27 @@ export default function App() {
                 )}
               </div>
             )}
+            {accessLogs.length > 0 && !isParticipant && !isSharedView && (() => {
+              const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
+              const last = accessLogs[0];
+              return (
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
+                  <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 4 }}>アクセス状況（オーナーのみ表示）</div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 11, color: "#c8d8c8" }}>
+                      総アクセス: <b style={{ color: GOLD }}>{accessLogs.length}</b> 回
+                    </span>
+                    <span style={{ fontSize: 11, color: "#c8d8c8" }}>
+                      ユニーク: <b style={{ color: GOLD }}>{uniqueDevices}</b> 人
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>
+                    最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP")}
+                    {last.ip_address && ` （${last.ip_address}）`}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
