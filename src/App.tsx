@@ -603,8 +603,9 @@ export default function App() {
     const debtors:   { idx: number; amount: number }[] = [];
     const creditors: { idx: number; amount: number }[] = [];
     for (let i = 0; i < n; i++) {
-      if (totals[i] < 0) debtors.push({ idx: i, amount: -totals[i] });
-      else if (totals[i] > 0) creditors.push({ idx: i, amount: totals[i] });
+      const combined = totals[i] + (displayOpts.olympic ? olympicTotals[i] : 0);
+      if (combined < 0) debtors.push({ idx: i, amount: -combined });
+      else if (combined > 0) creditors.push({ idx: i, amount: combined });
     }
     debtors.sort((a, b) => b.amount - a.amount);
     creditors.sort((a, b) => b.amount - a.amount);
@@ -619,7 +620,7 @@ export default function App() {
       if (creditors[ci].amount === 0) ci++;
     }
     return txs;
-  }, [totals, n]);
+  }, [totals, olympicTotals, displayOpts.olympic, n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasAnyInput = courseName.trim() !== "" ||
     scores.some(row => row.slice(0, n).some(s => s !== ""));
