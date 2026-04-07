@@ -915,11 +915,15 @@ export default function App() {
           </div>
           {/* 前半/後半ラベル */}
           <div style={{ marginTop: 8, borderTop: "1px solid #1a3a1a", paddingTop: 8, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
-            {([["前半", frontLabel, setFrontLabel], ["後半", backLabel, setBackLabel]] as const).map(([half, label, setLabel], idx) => (
+            {([["前半", frontLabel, setFrontLabel, 0], ["後半", backLabel, setBackLabel, 9]] as const).map(([half, label, setLabel, offset], idx) => (
               <div key={half} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
                 <span style={{ fontSize: 9, color: "#6a8a6a", minWidth: 26 }}>{half}</span>
                 {(["In", "Out"] as const).map(v => (
-                  <button key={v} onClick={() => setLabel(label === v ? "" : v)} style={{
+                  <button key={v} onClick={() => {
+                    const next = label === v ? "" : v;
+                    setLabel(next);
+                    if (next && courseNameValid && !isReadOnly) tryAutofillPars(next, offset);
+                  }} style={{
                     padding: "3px 8px", borderRadius: 10, fontSize: 10,
                     border: `1px solid ${label === v ? GOLD : "#2a4a2a"}`,
                     background: label === v ? "#2a1f00" : "transparent",
@@ -931,6 +935,7 @@ export default function App() {
                   value={label === "In" || label === "Out" ? "" : label}
                   onChange={e => setLabel(e.target.value)}
                   onFocus={() => { if (label === "In" || label === "Out") setLabel(""); }}
+                  onBlur={e => { if (e.target.value && courseNameValid && !isReadOnly) tryAutofillPars(e.target.value, offset); }}
                   placeholder="自由記載"
                   style={{
                     flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
