@@ -81,6 +81,8 @@ export default function App() {
   const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminSessionList, setAdminSessionList] = useState<{ id: string; course_name: string | null; mode: number; updated_at: string; names: string[]; device_id: string }[]>([]);
   // 参加者・閲覧者・管理者はオプション・チーム分けをローカルのみ変更可（DB非反映）
   const displayOpts = (isParticipant || isSharedView || isAdminMode) && localOpts !== null ? localOpts : opts;
   const displayTeamMode = (isParticipant || isSharedView || isAdminMode) && localTeamMode !== null ? localTeamMode : teamMode;
@@ -89,8 +91,6 @@ export default function App() {
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
   const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [adminSessionList, setAdminSessionList] = useState<{ id: string; course_name: string | null; mode: number; updated_at: string; names: string[]; device_id: string }[]>([]);
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
