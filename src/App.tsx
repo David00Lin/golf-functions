@@ -1465,30 +1465,6 @@ export default function App() {
                     })}
                   </div>
                 )}
-                {displayOpts.olympic && olympicMedals[h].slice(0, n).some(m => m !== null) && (
-                  <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#060d06" }}>
-                    <div style={{ padding: "2px", textAlign: "center", fontSize: 6, color: "#5a4a1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
-                      <span>OL</span>
-                      <span style={{ color: "#f5c842" }}>金{olympicPts.gold}</span>
-                      <span style={{ color: "#b0b8c0" }}>銀{olympicPts.silver}</span>
-                      <span style={{ color: "#cd7f32" }}>銅{olympicPts.bronze}</span>
-                      <span style={{ color: "#7a8a9a" }}>鉄{olympicPts.iron}</span>
-                    </div>
-                    {Array.from({ length: n }, (_, pi) => {
-                      const medal = olympicMedals[h][pi];
-                      const medalColor = medal === "金" ? "#f5c842" : medal === "銀" ? "#b0b8c0" : medal === "銅" ? "#cd7f32" : medal === "鉄" ? "#7a8a9a" : DIM;
-                      const pt = calcOlympicHolePts(olympicMedals[h], n)[pi];
-                      return (
-                        <div key={pi} style={{
-                          ...cell, padding: "2px 3px", textAlign: "center",
-                          fontSize: 10, fontWeight: "bold", color: pt > 0 ? medalColor : pt < 0 ? RED : DIM,
-                        }}>
-                          {medal ? `${medal} ${pt > 0 ? `+${pt}` : pt}` : ""}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
                 {r && r.tied && (
                   <div style={{ padding: "2px 8px", background: "#080f08", fontSize: 8, color: GOLD, textAlign: "center" }}>
                     引き分け → 次×{r.mult + 1}
