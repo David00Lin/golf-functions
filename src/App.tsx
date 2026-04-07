@@ -5,6 +5,7 @@ import { supabase } from "./lib/supabase";
 import { getSessionId, getDeviceId, newSession } from "./lib/session";
 
 const HOLES = 18;
+const PAR_AUTOFILL_THRESHOLD = 2;
 const GOLD = "#c8a96e";
 const GREEN = "#4a9b7f";
 const RED = "#f87171";
@@ -100,6 +101,40 @@ export default function App() {
     }, 300);
     return () => clearTimeout(timer);
   }, [courseName, courseNameValid, isSettingsLocked]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // par 自動入力ヘルパー
+  async function tryAutofillPars(label: string, holeOffset: number) {
+    const { data: course } = await supabase
+      .from("courses").select("id").ilike("name", courseName).maybeSingle();
+    if (!course) return;
+    const { data } = await supabase
+      .from("course_sections").select("pars")
+      .eq("course_id", course.id).ilike("label", label);
+    const counts = new Map<string, number>();
+    for (const row of data ?? []) {
+      const key = JSON.stringify(row.pars);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] >= PAR_AUTOFILL_THRESHOLD) {
+      const best: number[] = JSON.parse(top[0]);
+      setPars(prev => prev.map((p, i) =>
+        i >= holeOffset && i < holeOffset + 9 ? best[i - holeOffset] : p
+      ));
+    }
+  }
+
+  // 前半ラベル確定時に前半9H par を自動入力
+  useEffect(() => {
+    if (!courseNameValid || !frontLabel || isReadOnly) return;
+    tryAutofillPars(frontLabel, 0);
+  }, [frontLabel, courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 後半ラベル確定時に後半9H par を自動入力
+  useEffect(() => {
+    if (!courseNameValid || !backLabel || isReadOnly) return;
+    tryAutofillPars(backLabel, 9);
+  }, [backLabel, courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
