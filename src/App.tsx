@@ -522,6 +522,15 @@ export default function App() {
   }
 
   // 再発行時は同一session_id・同一roleの既存コードを削除してから新規作成
+  async function issueViewCodeForViewing() {
+    if (!viewingSessionId) return;
+    await supabase.from("share_tokens").delete().eq("session_id", viewingSessionId).eq("role", "view");
+    const token = generateShareToken();
+    const { error } = await supabase.from("share_tokens").insert({ token, session_id: viewingSessionId, role: "view" });
+    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
+    setViewCode(token);
+  }
+
   async function issueCode(role: "join" | "view") {
     if (!canSave || isDirty) return;
     await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
@@ -713,15 +722,32 @@ export default function App() {
               : "過去の記録を閲覧中"}
           </span>
           {isViewing && !isSharedView && (
-            <button onClick={handleContinueSession} style={{
-              padding: "5px 20px", borderRadius: 20,
-              border: `1.5px solid ${GOLD}`,
-              background: GOLD, color: "#1a1000",
-              fontSize: 12, cursor: "pointer", fontWeight: "bold", letterSpacing: 0.5,
-              whiteSpace: "nowrap",
-            }}>
-              このゲームを続ける
-            </button>
+            <>
+              <button onClick={issueViewCodeForViewing} style={{
+                padding: "5px 14px", borderRadius: 20,
+                border: "1px solid #2a4a6a",
+                background: "transparent", color: "#4a7a9b",
+                fontSize: 11, cursor: "pointer", letterSpacing: 0.5,
+                whiteSpace: "nowrap",
+              }}>
+                閲覧コードを発行
+              </button>
+              <button onClick={handleContinueSession} style={{
+                padding: "5px 20px", borderRadius: 20,
+                border: `1.5px solid ${GOLD}`,
+                background: GOLD, color: "#1a1000",
+                fontSize: 12, cursor: "pointer", fontWeight: "bold", letterSpacing: 0.5,
+                whiteSpace: "nowrap",
+              }}>
+                このゲームを続ける
+              </button>
+            </>
+          )}
+          {isViewing && !isSharedView && viewCode && (
+            <div style={{ width: "100%", textAlign: "center", marginTop: 4 }}>
+              <span style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 1 }}>閲覧コード: </span>
+              <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: "#f5f0e8" }}>{viewCode}</span>
+            </div>
           )}
         </div>
       )}
