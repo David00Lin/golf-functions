@@ -1123,7 +1123,7 @@ export default function App() {
                               background: "transparent", color: "#4a9b6b",
                               cursor: "pointer",
                             }}
-                          >コード発行</button>
+                          >編集コード発行</button>
                         ) : null}
                       </div>
                     )}
