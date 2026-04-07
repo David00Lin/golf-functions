@@ -577,11 +577,14 @@ export default function App() {
     });
     setMode(data.mode as 3 | 4);
     setCourseName(data.course_name ?? "");
+    setCourseNameValid(!!data.course_name);
     setNames(data.names);
     setPars(data.pars);
     setScores(data.scores);
     setOpts(data.opts);
     setTeamMode(data.team_mode);
+    setFrontLabel(data.front_label ?? "");
+    setBackLabel(data.back_label ?? "");
     setSessionDisplayDate(formatDate(data.updated_at));
     setSavedSnapshot(snap);
     if (tokenData.role === "join") {
@@ -877,7 +880,7 @@ export default function App() {
               </div>
             )}
           </div>
-          {courseName && !courseNameValid && (
+          {courseName && !courseNameValid && !isReadOnly && (
             <div style={{ fontSize: 9, color: RED, marginBottom: 4 }}>登録されていないゴルフ場です</div>
           )}
           <div style={{ textAlign: "right" }}>
