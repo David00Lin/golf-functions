@@ -65,6 +65,8 @@ export default function App() {
   });
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
   const [teamMode, setTeamMode] = useState("order_1_23");
+  const [frontLabel, setFrontLabel] = useState("");
+  const [backLabel, setBackLabel] = useState("");
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
   const [isSharedView, setIsSharedView] = useState(false);
@@ -237,6 +239,8 @@ export default function App() {
     setOpts({ carry: false, birdieReverse: false, truncate: false, push: false });
     setPushCounts(Array(HOLES).fill(0));
     setTeamMode("order_1_23");
+    setFrontLabel("");
+    setBackLabel("");
     setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
     setSavedSnapshot(null);
     setShowHistory(false);
@@ -698,6 +702,33 @@ export default function App() {
           <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
           </div>
+          {/* 前半/後半ラベル */}
+          <div style={{ marginTop: 8, borderTop: "1px solid #1a3a1a", paddingTop: 8, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
+            {([["前半", frontLabel, setFrontLabel], ["後半", backLabel, setBackLabel]] as const).map(([half, label, setLabel], idx) => (
+              <div key={half} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
+                <span style={{ fontSize: 9, color: "#6a8a6a", minWidth: 26 }}>{half}</span>
+                {(["Out", "In"] as const).map(v => (
+                  <button key={v} onClick={() => setLabel(v)} style={{
+                    padding: "3px 8px", borderRadius: 10, fontSize: 10,
+                    border: `1px solid ${label === v ? GOLD : "#2a4a2a"}`,
+                    background: label === v ? "#2a1f00" : "transparent",
+                    color: label === v ? GOLD : "#6b8b6b",
+                    cursor: "pointer",
+                  }}>{v}</button>
+                ))}
+                <input
+                  value={label === "Out" || label === "In" ? "" : label}
+                  onChange={e => setLabel(e.target.value)}
+                  placeholder="自由記載"
+                  style={{
+                    flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
+                    background: "#0a160a", border: "1px solid #2a4a2a",
+                    color: "#f5f0e8", outline: "none",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Player names */}
@@ -780,7 +811,7 @@ export default function App() {
         {/* Score grid */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, border: "1px solid #2a4a2a", overflow: "hidden", marginBottom: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#0a160a", borderBottom: "1px solid #2a4a2a" }}>
-            <div style={{ padding: "7px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>H</div>
+            <div style={{ padding: "7px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>{frontLabel || "H"}</div>
             {Array.from({ length: n }, (_, i) => (
               <div key={i} style={{
                 padding: "7px 2px", textAlign: "center", fontSize: 11, fontWeight: "bold",
@@ -942,7 +973,7 @@ export default function App() {
                   borderBottom: `2px solid ${GOLD}`,
                 }}>
                   <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 7 }}>前半</span>
+                    <span style={{ fontSize: 7 }}>{frontLabel || "前半"}</span>
                     <span>計</span>
                   </div>
                   {Array.from({ length: n }, (_, pi) => {
@@ -957,6 +988,17 @@ export default function App() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              {h === 8 && backLabel && (
+                <div style={{
+                  display: "grid", gridTemplateColumns: gridCols,
+                  background: "#0a160a", borderBottom: "1px solid #2a4a2a",
+                }}>
+                  <div style={{ padding: "4px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>{backLabel}</div>
+                  {Array.from({ length: n }, (_, i) => (
+                    <div key={i} style={{ borderLeft: "1px solid #2a4a2a" }} />
+                  ))}
                 </div>
               )}
               </React.Fragment>
