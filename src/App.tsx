@@ -45,15 +45,16 @@ interface Result4 {
 }
 type Result = Result3 | Result4 | null;
 
+const JST = { timeZone: "Asia/Tokyo" } as const;
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", ...JST });
 }
 
 export default function App() {
   const [mode, setMode] = useState<3 | 4>(4);
   const [courseName, setCourseName] = useState("");
   const [sessionDisplayDate, setSessionDisplayDate] = useState(
-    new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
+    new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", ...JST })
   );
   const [sessionId, setSessionId] = useState(getSessionId());
   const [names, setNames] = useState(["Player1", "Player2", "Player3", "Player4"]);
@@ -354,7 +355,7 @@ export default function App() {
     setBackLabel("");
     setCourseNameValid(false);
     setCourseSuggestions([]);
-    setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }));
+    setSessionDisplayDate(new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", ...JST }));
     setSavedSnapshot(null);
     setShowHistory(false);
     setViewingSessionId(null);
@@ -869,7 +870,7 @@ export default function App() {
                   <span style={{ fontSize: 11, color: "#c8d8c8" }}>ユニーク: <b style={{ color: GOLD }}>{uniqueDevices}</b> 人</span>
                 </div>
                 <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 3 }}>
-                  最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP")}
+                  最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                 </div>
               </div>
             );
@@ -1444,7 +1445,7 @@ export default function App() {
                     <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{joinCode}</div>
                     {joinCodeExpiresAt && (
                       <div style={{ fontSize: 9, color: "#c0a030", marginTop: 2 }}>
-                        有効期限: {new Date(joinCodeExpiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })} まで（16時間）
+                        有効期限: {new Date(joinCodeExpiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })} まで（16時間）
                       </div>
                     )}
                     <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 2 }}>再発行すると旧コードは無効になります</div>
@@ -1474,7 +1475,7 @@ export default function App() {
                     </span>
                   </div>
                   <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>
-                    最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP")}
+                    最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                   </div>
                 </div>
               );
