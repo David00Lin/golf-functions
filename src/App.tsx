@@ -81,9 +81,9 @@ export default function App() {
   const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
-  // 参加者・閲覧者はオプション・チーム分けをローカルのみ変更可（DB非反映）
-  const displayOpts = (isParticipant || isSharedView) && localOpts !== null ? localOpts : opts;
-  const displayTeamMode = (isParticipant || isSharedView) && localTeamMode !== null ? localTeamMode : teamMode;
+  // 参加者・閲覧者・管理者はオプション・チーム分けをローカルのみ変更可（DB非反映）
+  const displayOpts = (isParticipant || isSharedView || isAdminMode) && localOpts !== null ? localOpts : opts;
+  const displayTeamMode = (isParticipant || isSharedView || isAdminMode) && localTeamMode !== null ? localTeamMode : teamMode;
   const [playerTokens, setPlayerTokens] = useState<(string | null)[]>([null, null, null, null]);
   const [playerTokenExpiresAt, setPlayerTokenExpiresAt] = useState<(string | null)[]>([null, null, null, null]);
   const [viewCode, setViewCode] = useState<string | null>(null);
@@ -317,6 +317,8 @@ export default function App() {
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
+    setLocalOpts(null);
+    setLocalTeamMode(null);
     setShowHistory(false);
   }
 
@@ -1167,10 +1169,10 @@ export default function App() {
         {/* 4人チーム分け */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
-          {(isParticipant || isSharedView) && (
+          {(isParticipant || isSharedView || isAdminMode) && (
             <div style={{ fontSize: 8, color: "#4a7a4a", marginBottom: 4, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView) ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
             {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
               const active = displayTeamMode === id;
               let display = label;
@@ -1182,7 +1184,7 @@ export default function App() {
               if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
               return (
                 <button key={id} onClick={() => {
-                  if (isParticipant || isSharedView) setLocalTeamMode(id);
+                  if (isParticipant || isSharedView || isAdminMode) setLocalTeamMode(id);
                   else setTeamMode(id);
                 }} style={{
                   padding: "7px 4px", borderRadius: 8,
@@ -1204,8 +1206,8 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView) ? 0.6 : 1 }}>
-            {(isParticipant || isSharedView) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
+            {(isParticipant || isSharedView || isAdminMode) && (
               <div style={{ width: "100%", fontSize: 8, color: "#4a7a4a", marginBottom: 2, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
             )}
             {([
@@ -1215,7 +1217,7 @@ export default function App() {
               { k: "push" as const, l: "プッシュ" },
             ]).map(({ k, l }) => (
               <button key={k} onClick={() => {
-                if (isParticipant || isSharedView) {
+                if (isParticipant || isSharedView || isAdminMode) {
                   setLocalOpts(prev => ({ ...(prev ?? opts), [k]: !(prev ?? opts)[k] }));
                 } else {
                   setOpts(o => ({ ...o, [k]: !o[k] }));
