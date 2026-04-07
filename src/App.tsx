@@ -1621,9 +1621,9 @@ export default function App() {
                     <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>({grossTotals[pi]})</span>
                   )}
                 </span>
-                {displayOpts.olympic && olympicTotals[pi] > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: "bold", color: "#f5c842" }}>
-                    OL +{olympicTotals[pi]}
+                {displayOpts.olympic && olympicTotals[pi] !== 0 && (
+                  <span style={{ fontSize: 12, fontWeight: "bold", color: olympicTotals[pi] > 0 ? "#f5c842" : RED }}>
+                    OL {olympicTotals[pi] > 0 ? `+${olympicTotals[pi]}` : olympicTotals[pi]}
                   </span>
                 )}
               </div>
