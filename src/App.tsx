@@ -1244,7 +1244,7 @@ export default function App() {
                   {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
                 </span>
                 {grossTotals[pi] > 0 && (
-                  <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>{grossTotals[pi]}</span>
+                  <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>({grossTotals[pi]})</span>
                 )}
               </span>
             </div>
