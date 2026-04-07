@@ -481,6 +481,33 @@ export default function App() {
     return t;
   }, [results]);
 
+  const grossTotals = useMemo(() => {
+    return Array.from({ length: 4 }, (_, pi) =>
+      scores.reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    );
+  }, [scores]);
+
+  const grossHalf = useMemo(() => {
+    return Array.from({ length: 4 }, (_, pi) =>
+      scores.slice(0, 9).reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    );
+  }, [scores]);
+
+  const grossBack = useMemo(() => {
+    return Array.from({ length: 4 }, (_, pi) =>
+      scores.slice(9, 18).reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    );
+  }, [scores]);
+
   // 精算：誰が誰にいくら払うか（最小取引数）
   const settlement = useMemo(() => {
     const debtors:   { idx: number; amount: number }[] = [];
@@ -1139,13 +1166,16 @@ export default function App() {
                   </div>
                   {Array.from({ length: n }, (_, pi) => {
                     const pt = backTotals[pi];
+                    const gs = grossBack[pi];
                     return (
                       <div key={pi} style={{
                         ...cell, padding: "5px 3px", textAlign: "center",
                         fontSize: 13, fontWeight: "bold",
                         color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                       }}>
-                        {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
+                        <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
+                        {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
                       </div>
                     );
                   })}
@@ -1165,13 +1195,16 @@ export default function App() {
                   </div>
                   {Array.from({ length: n }, (_, pi) => {
                     const pt = halfTotals[pi];
+                    const gs = grossHalf[pi];
                     return (
                       <div key={pi} style={{
                         ...cell, padding: "5px 3px", textAlign: "center",
                         fontSize: 13, fontWeight: "bold",
                         color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                       }}>
-                        {pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}
+                        <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
+                        {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
                       </div>
                     );
                   })}
@@ -1203,11 +1236,16 @@ export default function App() {
               borderBottom: pi < n - 1 ? "1px solid #1a3a1a" : "none",
             }}>
               <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
-              <span style={{
-                fontSize: 20, fontWeight: "bold",
-                color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
-              }}>
-                {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
+              <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                <span style={{
+                  fontSize: 20, fontWeight: "bold",
+                  color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
+                }}>
+                  {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
+                </span>
+                {grossTotals[pi] > 0 && (
+                  <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>{grossTotals[pi]}</span>
+                )}
               </span>
             </div>
           ))}
