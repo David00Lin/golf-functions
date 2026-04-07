@@ -316,7 +316,7 @@ export default function App() {
   function startNewSession() {
     const id = newSession();
     setSessionId(id);
-    setMode(3);
+    setMode(4);
     setCourseName("");
     setNames(["Player1", "Player2", "Player3", "Player4"]);
     setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
