@@ -1403,22 +1403,27 @@ export default function App() {
                                 { m: "鉄", color: "#7a8a9a" },
                               ]).map(({ m, color }) => {
                                 const selected = olympicMedals[h][pi] === m;
+                                const takenByOther = !selected && olympicMedals[h].some((v, rp) => rp !== pi && v === m);
                                 return (
                                   <button
                                     key={m}
+                                    disabled={takenByOther}
                                     onClick={() => {
+                                      if (takenByOther) return;
                                       setOlympicMedals(prev => prev.map((row, rh) =>
                                         rh === h ? row.map((v, rp) => rp === pi ? (v === m ? null : m) : v) : row
                                       ));
                                     }}
                                     style={{
                                       padding: "1px 2px", fontSize: 7, lineHeight: 1,
-                                      borderRadius: 3, border: `1px solid ${selected ? color : "#2a4a2a"}`,
+                                      borderRadius: 3,
+                                      border: `1px solid ${selected ? color : takenByOther ? "#1a2a1a" : "#2a4a2a"}`,
                                       background: selected ? color + "33" : "transparent",
-                                      color: selected ? color : "#3a5a3a",
-                                      cursor: isReadOnly ? "default" : "pointer",
+                                      color: selected ? color : takenByOther ? "#2a3a2a" : "#3a5a3a",
+                                      cursor: takenByOther ? "default" : "pointer",
                                       fontWeight: selected ? "bold" : "normal",
                                       minWidth: 14,
+                                      opacity: takenByOther ? 0.35 : 1,
                                     }}
                                   >{m}</button>
                                 );
