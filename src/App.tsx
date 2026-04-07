@@ -579,7 +579,7 @@ export default function App() {
   const filledHoles = scores.filter(row => row.slice(0, n).every(s => s !== "")).length;
   const canSave = !isViewing &&
     courseNameValid &&
-    names.slice(0, n).every(name => name.trim() !== "") &&
+    names.slice(0, n).every(name => name.trim() !== "" && !/^Player\d+$/.test(name.trim())) &&
     !pars.every(v => v === 4) &&
     filledHoles >= 3;
 
