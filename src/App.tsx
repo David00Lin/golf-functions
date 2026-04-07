@@ -320,10 +320,12 @@ export default function App() {
 
   const n = mode;
 
-  const setScore = (h: number, pi: number, v: string) =>
+  const setScore = (h: number, pi: number, v: string) => {
+    if (v !== "" && !/^\d+$/.test(v)) return;
     setScores(prev => prev.map((row, rh) =>
       rh === h ? row.map((s, rp) => rp === pi ? v : s) : row
     ));
+  };
 
   function handleNumpad(key: string) {
     if (!activeCell) return;
