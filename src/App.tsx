@@ -233,6 +233,27 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // オーナー用：既発行コードをDBから取得して常時表示
+  useEffect(() => {
+    if (isSharedView || isParticipant) return;
+    const targetId = viewingSessionId ?? sessionId;
+    supabase.from("share_tokens").select("token, role, expires_at").eq("session_id", targetId)
+      .then(({ data }) => {
+        if (!data) return;
+        setJoinCode(null); setJoinCodeExpiresAt(null); setViewCode(null);
+        data.forEach(row => {
+          if (row.role === "join") {
+            if (!row.expires_at || new Date(row.expires_at) > new Date()) {
+              setJoinCode(row.token);
+              setJoinCodeExpiresAt(row.expires_at ?? null);
+            }
+          } else if (row.role === "view") {
+            setViewCode(row.token);
+          }
+        });
+      });
+  }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
     if (isDirty && !window.confirm("現在の入力内容は保存されません。過去の記録を表示しますか？")) return;
