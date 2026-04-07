@@ -71,6 +71,7 @@ export default function App() {
   const [courseSuggestions, setCourseSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [courseNameValid, setCourseNameValid] = useState(false);
+  const [activeCell, setActiveCell] = useState<{ h: number; pi: number } | null>(null);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
   const [isSharedView, setIsSharedView] = useState(false);
@@ -323,6 +324,16 @@ export default function App() {
     setScores(prev => prev.map((row, rh) =>
       rh === h ? row.map((s, rp) => rp === pi ? v : s) : row
     ));
+
+  function handleNumpad(key: string) {
+    if (!activeCell) return;
+    const { h, pi } = activeCell;
+    const cur = scores[h][pi];
+    if (key === "⌫") { setScore(h, pi, cur.slice(0, -1)); return; }
+    if (cur.length >= 2) { setScore(h, pi, key); return; }
+    const next = cur + key;
+    setScore(h, pi, parseInt(next) > 15 ? key : next);
+  }
 
   const orders = useMemo(() => {
     const result: number[][] = [];
@@ -1010,25 +1021,27 @@ export default function App() {
                             {isTeamA ? "A" : "B"}
                           </div>
                         )}
-                        <input
-                          type="number"
-                          value={sc}
-                          onChange={e => setScore(h, pi, e.target.value)}
-                          min={1} max={15}
-                          disabled={isReadOnly}
+                        <div
+                          onClick={() => { if (!isReadOnly) setActiveCell({ h, pi }); }}
                           style={{
                             width: "100%", boxSizing: "border-box",
                             padding: "7px 0", textAlign: "center",
-                            background: "transparent",
-                            border: `1.5px solid ${isSolo ? "#3a2e00" : isTeamA ? "#2a2000" : "#1a3a2e"}`,
+                            background: activeCell?.h === h && activeCell?.pi === pi
+                              ? "rgba(200,169,110,0.15)" : "transparent",
+                            border: `1.5px solid ${
+                              activeCell?.h === h && activeCell?.pi === pi ? GOLD
+                              : isSolo ? "#3a2e00" : isTeamA ? "#2a2000" : "#1a3a2e"
+                            }`,
                             borderRadius: 6,
                             fontSize: 17, fontWeight: "bold",
-                            color: scoreColor, outline: "none",
-                            MozAppearance: "textfield",
+                            color: sc ? scoreColor : "#3a4a3a",
+                            cursor: isReadOnly ? "default" : "pointer",
+                            userSelect: "none",
+                            minHeight: 32, display: "flex",
+                            alignItems: "center", justifyContent: "center",
                             opacity: isReadOnly ? 0.8 : 1,
-                          } as React.CSSProperties}
-                          placeholder="·"
-                        />
+                          }}
+                        >{sc || "·"}</div>
                         {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>単独</div>}
                       </div>
                     );
@@ -1270,6 +1283,31 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* テンキー */}
+      {activeCell && !isReadOnly && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          background: "#0f1f0f", borderTop: `2px solid ${GOLD}`,
+          padding: "8px 12px 12px", zIndex: 300,
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6,
+          maxWidth: 520, margin: "0 auto",
+        }}>
+          {["1","2","3","4","5","6","7","8","9","✕","0","⌫"].map(key => (
+            <button
+              key={key}
+              onPointerDown={e => { e.preventDefault(); if (key === "✕") { setActiveCell(null); } else { handleNumpad(key); } }}
+              style={{
+                padding: "14px 0", borderRadius: 8, fontSize: 20, fontWeight: "bold",
+                cursor: "pointer", userSelect: "none",
+                background: key === "✕" ? "#1a0a0a" : "#1a2e1a",
+                border: `1px solid ${key === "✕" ? RED : "#2a4a2a"}`,
+                color: key === "✕" ? RED : key === "⌫" ? GOLD : "#f5f0e8",
+              }}
+            >{key}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
