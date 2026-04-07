@@ -65,6 +65,7 @@ export default function App() {
   const [opts, setOpts] = useState<Opts>({
     carry: false, birdieReverse: false, truncate: false, push: false,
   });
+  const [localOpts, setLocalOpts] = useState<Opts | null>(null);
   const [pushCounts, setPushCounts] = useState<number[]>(Array(HOLES).fill(0));
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [frontLabel, setFrontLabel] = useState("");
@@ -79,6 +80,8 @@ export default function App() {
   const [isParticipant, setIsParticipant] = useState(false);
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
+  // 参加者・閲覧者はオプションをローカルのみ変更可（DB非反映）
+  const displayOpts = (isParticipant || isSharedView) && localOpts !== null ? localOpts : opts;
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [joinCodeExpiresAt, setJoinCodeExpiresAt] = useState<string | null>(null);
   const [viewCode, setViewCode] = useState<string | null>(null);
@@ -330,6 +333,7 @@ export default function App() {
     localStorage.setItem("golf_session_id", viewingSessionId);
     setSessionId(viewingSessionId);
     setViewingSessionId(null);
+    setLocalOpts(null);
     // savedSnapshot は loadSessionById で設定済み → isDirty=false（保存済み扱い）
   }
 
@@ -432,16 +436,16 @@ export default function App() {
       const ps = pair.map(pi => Number(s[pi]));
       let soloTeam = ss * 11;
       let lo = Math.min(...ps), hi = Math.max(...ps);
-      if (opts.birdieReverse && ss < par) [lo, hi] = [hi, lo];
+      if (displayOpts.birdieReverse && ss < par) [lo, hi] = [hi, lo];
       let pairTeam = lo * 10 + hi;
-      if (opts.truncate) {
+      if (displayOpts.truncate) {
         soloTeam = Math.floor(soloTeam / 10) * 10;
         pairTeam = Math.floor(pairTeam / 10) * 10;
       }
       const diff = pairTeam - soloTeam;
-      const pushMult = opts.push ? Math.pow(2, pushCounts[h]) : 1;
+      const pushMult = displayOpts.push ? Math.pow(2, pushCounts[h]) : 1;
       const mult = carry * pushMult;
-      if (diff === 0 && opts.carry) {
+      if (diff === 0 && displayOpts.carry) {
         carry++;
         return { solo, pair, soloTeam, pairTeam, diff: 0, mult, tied: true, pts: Array(4).fill(0) };
       }
@@ -452,7 +456,7 @@ export default function App() {
       else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
+  }, [orders, scores, pars, displayOpts, pushCounts, mode, teamMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results4 = useMemo((): (Result4 | null)[] => {
     if (mode !== 4) return [];
@@ -466,20 +470,20 @@ export default function App() {
       const sB = tB.map(pi => Number(s[pi]));
       let loA = Math.min(...sA), hiA = Math.max(...sA);
       let loB = Math.min(...sB), hiB = Math.max(...sB);
-      if (opts.birdieReverse) {
+      if (displayOpts.birdieReverse) {
         if (sA.some(sc => sc < par)) [loB, hiB] = [hiB, loB]; // Aがバーディー → 相手Bの数字を逆転
         if (sB.some(sc => sc < par)) [loA, hiA] = [hiA, loA]; // Bがバーディー → 相手Aの数字を逆転
       }
       let scA = loA * 10 + hiA;
       let scB = loB * 10 + hiB;
-      if (opts.truncate) {
+      if (displayOpts.truncate) {
         scA = Math.floor(scA / 10) * 10;
         scB = Math.floor(scB / 10) * 10;
       }
       const diff = scB - scA;
-      const pushMult = opts.push ? Math.pow(2, pushCounts[h]) : 1;
+      const pushMult = displayOpts.push ? Math.pow(2, pushCounts[h]) : 1;
       const mult = carry * pushMult;
-      if (diff === 0 && opts.carry) {
+      if (diff === 0 && displayOpts.carry) {
         carry++;
         return { tA, tB, scA, scB, diff: 0, mult, tied: true, pts: Array(4).fill(0) };
       }
@@ -493,7 +497,7 @@ export default function App() {
       }
       return { tA, tB, scA, scB, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, opts, pushCounts, mode, teamMode]);
+  }, [orders, scores, pars, displayOpts, pushCounts, mode, teamMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results: Result[] = mode === 3 ? results3 : results4;
 
@@ -669,6 +673,7 @@ export default function App() {
       setIsSharedView(true);
       setIsParticipant(false);
     }
+    setLocalOpts(null);
     setShareInput("");
     setShowHistory(false);
 
@@ -1084,20 +1089,29 @@ export default function App() {
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView) ? 0.6 : 1 }}>
+            {(isParticipant || isSharedView) && (
+              <div style={{ width: "100%", fontSize: 8, color: "#4a7a4a", marginBottom: 2, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
+            )}
             {([
               { k: "birdieReverse" as const, l: "バーディー逆転" },
               { k: "truncate" as const, l: "1の位切捨て" },
               { k: "carry" as const, l: "キャリー" },
               { k: "push" as const, l: "プッシュ" },
             ]).map(({ k, l }) => (
-              <button key={k} onClick={() => setOpts(o => ({ ...o, [k]: !o[k] }))} style={{
+              <button key={k} onClick={() => {
+                if (isParticipant || isSharedView) {
+                  setLocalOpts(prev => ({ ...(prev ?? opts), [k]: !(prev ?? opts)[k] }));
+                } else {
+                  setOpts(o => ({ ...o, [k]: !o[k] }));
+                }
+              }} style={{
                 padding: "4px 11px", borderRadius: 20,
-                border: `1.5px solid ${opts[k] ? GOLD : "#2a4a2a"}`,
-                background: opts[k] ? "#2a1f00" : "transparent",
-                color: opts[k] ? GOLD : "#6b8b6b",
+                border: `1.5px solid ${displayOpts[k] ? GOLD : "#2a4a2a"}`,
+                background: displayOpts[k] ? "#2a1f00" : "transparent",
+                color: displayOpts[k] ? GOLD : "#6b8b6b",
                 fontSize: 11, cursor: "pointer",
-                fontWeight: opts[k] ? "bold" : "normal",
+                fontWeight: displayOpts[k] ? "bold" : "normal",
               }}>{l}</button>
             ))}
           </div>
@@ -1148,7 +1162,7 @@ export default function App() {
                         }}>{p}</button>
                       ))}
                     </div>
-                    {opts.push && (
+                    {displayOpts.push && (
                       <select
                         value={pushCounts[h]}
                         onChange={e => setPushCounts(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
