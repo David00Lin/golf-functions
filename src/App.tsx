@@ -910,10 +910,6 @@ export default function App() {
     return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   }
 
-  function makeShareUrl(token: string): string {
-    return `${window.location.origin}/?c=${token}`;
-  }
-
   // 再発行時は同一session_id・同一roleの既存コードを削除してから新規作成
   async function issueViewCodeForViewing() {
     if (!viewingSessionId) return;
@@ -1204,7 +1200,7 @@ export default function App() {
                 fontSize: 11, cursor: "pointer", letterSpacing: 0.5,
                 whiteSpace: "nowrap",
               }}>
-                閲覧リンクを発行
+                閲覧コードを発行
               </button>
               <button onClick={handleContinueSession} style={{
                 padding: "5px 20px", borderRadius: 20,
@@ -1219,10 +1215,8 @@ export default function App() {
           )}
           {isViewing && !isSharedView && viewCode && (
             <div style={{ width: "100%", textAlign: "center", marginTop: 4 }}>
-              <button
-                onClick={() => navigator.clipboard.writeText(makeShareUrl(viewCode))}
-                style={{ padding: "4px 14px", fontSize: 9, borderRadius: 12, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
-              >閲覧リンクをコピー</button>
+              <span style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 1 }}>閲覧コード: </span>
+              <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: "#f5f0e8" }}>{viewCode}</span>
             </div>
           )}
           {isViewing && !isSharedView && accessLogs.length > 0 && (() => {
@@ -1518,6 +1512,7 @@ export default function App() {
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                         {token ? (
                           <>
+                            <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
                             {expiresAt && (
                               <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
                                 {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}まで
@@ -1525,9 +1520,9 @@ export default function App() {
                             )}
                             <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
                               <button
-                                onClick={() => navigator.clipboard.writeText(makeShareUrl(token))}
-                                style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, cursor: "pointer" }}
-                              >リンクコピー</button>
+                                onClick={() => navigator.clipboard.writeText(token)}
+                                style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a6a4a", background: "transparent", color: "#4a9b6b", cursor: "pointer" }}
+                              >コピー</button>
                               <button
                                 onClick={() => issuePlayerCode(i)}
                                 style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
@@ -1544,11 +1539,11 @@ export default function App() {
                             title={isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力" : ""}
                             style={{
                               width: "100%", padding: "3px 0", fontSize: 8, borderRadius: 4,
-                              border: `1px solid ${GOLD}`,
-                              background: "transparent", color: GOLD,
+                              border: "1px solid #2a6a4a",
+                              background: "transparent", color: "#4a9b6b",
                               cursor: "pointer",
                             }}
-                          >招待リンクを発行</button>
+                          >編集コード発行</button>
                         ) : null}
                       </div>
                     )}
@@ -2069,21 +2064,18 @@ export default function App() {
                       opacity: enabled ? 1 : 0.4,
                     }}
                   >
-                    閲覧リンクを発行
+                    閲覧コードを発行
                   </button>
                 </div>
               );
             })()}
             {viewCode && (
-              <div style={{ marginTop: 8, display: "flex", justifyContent: "center" }}>
-                <button
-                  onClick={() => navigator.clipboard.writeText(makeShareUrl(viewCode))}
-                  style={{
-                    padding: "6px 20px", borderRadius: 20, fontSize: 11,
-                    border: "1px solid #2a4a6a", background: "transparent",
-                    color: "#4a7a9b", cursor: "pointer", letterSpacing: 0.5,
-                  }}
-                >閲覧リンクをコピー</button>
+              <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
+                  <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>閲覧コード（読み取り専用）</div>
+                  <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
+                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                </div>
               </div>
             )}
             {accessLogs.length > 0 && !isParticipant && !isSharedView && (() => {
