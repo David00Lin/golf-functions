@@ -1213,13 +1213,32 @@ export default function App() {
   }, [canSave, currentSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridCols = `36px repeat(${n}, 1fr)`;
-  const cell: React.CSSProperties = { borderLeft: "1px solid #1a3a1a", padding: "4px 3px" };
+  const T = {
+    bg:         lvMode ? "#1a2e1a" : "#f5f5f0",
+    bgCard:     lvMode ? "#0f1f0f" : "#ffffff",
+    bgInput:    lvMode ? "#1a2e1a" : "#f0f0ec",
+    bgDeep:     lvMode ? "#0a160a" : "#eeeeea",
+    bgDark:     lvMode ? "#080f08" : "#e8e8e4",
+    bgAlt:      lvMode ? "#0b190b" : "#f8f8f4",
+    bgScore:    lvMode ? "#0a1a0a" : "#eef2ee",
+    bgOlympic:  lvMode ? "#090f09" : "#e8e8e4",
+    border:     lvMode ? "#2a4a2a" : "#c8c8be",
+    borderDim:  lvMode ? "#1a3a1a" : "#deded4",
+    borderDark: lvMode ? "#1a2a1a" : "#e0e0d8",
+    borderMid:  lvMode ? "#2a3a1a" : "#d0d8d0",
+    text:       lvMode ? "#f5f0e8" : "#1a1a14",
+    textSub:    lvMode ? "#c8d8c8" : "#3a4a3a",
+    textDim:    lvMode ? "#6b8b6b" : "#5a5a5a",
+    textDimmer: lvMode ? "#4a6a4a" : "#8b8b8b",
+    headerGrad: lvMode ? "linear-gradient(135deg, #0f1f0f, #1a3a1a)" : "linear-gradient(135deg, #e8ede8, #dce8dc)",
+  };
+  const cell: React.CSSProperties = { borderLeft: `1px solid ${T.borderDim}`, padding: "4px 3px" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#1a2e1a", fontFamily: "'Georgia', serif", color: "#f5f0e8" }}>
+    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'Georgia', serif", color: T.text }}>
       {/* Header */}
       <div style={{
-        background: "linear-gradient(135deg, #0f1f0f, #1a3a1a)",
+        background: T.headerGrad,
         borderBottom: `2px solid ${GOLD}`,
         padding: "16px 16px 12px", textAlign: "center",
         position: "relative",
@@ -1231,15 +1250,15 @@ export default function App() {
             onClick={() => { if (!isSettingsLocked) setLvMode(v => !v); }}
             style={{
               width: 36, height: 20, borderRadius: 10, cursor: isSettingsLocked ? "default" : "pointer",
-              background: lvMode ? "#2a1f00" : "#1a2a1a",
-              border: `1.5px solid ${lvMode ? GOLD : "#3a5a3a"}`,
+              background: lvMode ? "#2a1f00" : T.borderDark,
+              border: `1.5px solid ${lvMode ? GOLD : T.borderDark}`,
               position: "relative", transition: "background 0.2s",
               opacity: isSettingsLocked ? 0.5 : 1,
             }}
           >
             <div style={{
               width: 14, height: 14, borderRadius: 7,
-              background: lvMode ? GOLD : "#4a6a4a",
+              background: lvMode ? GOLD : T.textDimmer,
               position: "absolute", top: 2,
               left: lvMode ? 18 : 2,
               transition: "left 0.2s, background 0.2s",
@@ -1249,8 +1268,8 @@ export default function App() {
         <button onClick={() => { window.location.href = lang === "ja" ? "/zh/index.html" : "/index.html"; }} style={{
           position: "absolute", top: 14, right: 44,
           background: lang === "zh" ? "#2a1f00" : "transparent",
-          border: `1px solid ${lang === "zh" ? GOLD : "#2a4a2a"}`,
-          borderRadius: 6, color: lang === "zh" ? GOLD : "#6b8b6b",
+          border: `1px solid ${lang === "zh" ? GOLD : T.border}`,
+          borderRadius: 6, color: lang === "zh" ? GOLD : T.textDim,
           fontSize: 11, cursor: "pointer", padding: "2px 6px",
         }}>{lang === "zh" ? "日本語" : "繁"}</button>
         {/* ハンバーガーメニュー */}
@@ -1261,7 +1280,7 @@ export default function App() {
           lineHeight: 1, padding: "2px 4px",
         }}>☰</button>
         {/* セパレーター */}
-        <div style={{ borderTop: "1px solid #2a4a2a", marginTop: 10 }} />
+        <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 10 }} />
         {/* コントロール行: 新ゲーム | セグメント人数切替 | 履歴 */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "0 4px" }}>
           <button
@@ -1269,9 +1288,9 @@ export default function App() {
             disabled={!hasAnyInput}
             style={{
               padding: "4px 10px", borderRadius: 12,
-              border: `1px solid ${hasAnyInput ? "#4a6a4a" : "#2a3a2a"}`,
+              border: `1px solid ${hasAnyInput ? T.textDimmer : "#2a3a2a"}`,
               background: "transparent",
-              color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
+              color: hasAnyInput ? T.textDim : "#2a3a2a",
               fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
             }}>{t('newGame')}</button>
           {isParticipant ? (
@@ -1282,14 +1301,14 @@ export default function App() {
               fontSize: 12, fontWeight: "bold",
             }}>{mode}人</div>
           ) : (
-            <div style={{ display: "inline-flex", border: "1px solid #2a4a2a", borderRadius: 8, overflow: "hidden", opacity: isReadOnly ? 0.5 : 1 }}>
+            <div style={{ display: "inline-flex", border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", opacity: isReadOnly ? 0.5 : 1 }}>
               {([3, 4] as const).map((m, i) => (
                 <button key={m} onClick={() => !isReadOnly && handleModeChange(m)} style={{
                   padding: "3px 16px",
                   border: "none",
-                  borderRight: i === 0 ? "1px solid #2a4a2a" : "none",
+                  borderRight: i === 0 ? `1px solid ${T.border}` : "none",
                   background: mode === m ? "#2a1f00" : "transparent",
-                  color: mode === m ? GOLD : "#6b8b6b",
+                  color: mode === m ? GOLD : T.textDim,
                   fontSize: 12, cursor: isReadOnly ? "default" : "pointer",
                   fontWeight: mode === m ? "bold" : "normal",
                 }}>{m}人</button>
@@ -1298,9 +1317,9 @@ export default function App() {
           )}
           <button onClick={toggleHistory} style={{
             padding: "4px 10px", borderRadius: 12,
-            border: `1px solid ${showHistory ? GOLD : "#2a4a2a"}`,
+            border: `1px solid ${showHistory ? GOLD : T.border}`,
             background: showHistory ? "#2a1f00" : "transparent",
-            color: showHistory ? GOLD : "#6b8b6b",
+            color: showHistory ? GOLD : T.textDim,
             fontSize: 10, cursor: "pointer",
           }}>{t('history')}</button>
         </div>
@@ -1349,20 +1368,20 @@ export default function App() {
           {isViewing && !isSharedView && viewCode && (
             <div style={{ width: "100%", textAlign: "center", marginTop: 4 }}>
               <span style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 1 }}>{t('viewCodeBtn')}</span>
-              <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: "#f5f0e8" }}>{viewCode}</span>
+              <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: T.text }}>{viewCode}</span>
             </div>
           )}
           {isViewing && !isSharedView && accessLogs.length > 0 && (() => {
             const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
             const last = accessLogs[0];
             return (
-              <div style={{ width: "100%", marginTop: 6, padding: "6px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
-                <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 3 }}>{t('accessStats')}</div>
+              <div style={{ width: "100%", marginTop: 6, padding: "6px 12px", background: T.bgDark, borderRadius: 8, border: `1px solid ${T.borderDim}` }}>
+                <div style={{ fontSize: 9, color: T.textDim, letterSpacing: 1, marginBottom: 3 }}>{t('accessStats')}</div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>{t('totalAccess')}<b style={{ color: GOLD }}>{accessLogs.length}</b>{t('times')}</span>
-                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>{t('uniqueUsers')}<b style={{ color: GOLD }}>{uniqueDevices}</b>{t('people')}</span>
+                  <span style={{ fontSize: 11, color: T.textSub }}>{t('totalAccess')}<b style={{ color: GOLD }}>{accessLogs.length}</b>{t('times')}</span>
+                  <span style={{ fontSize: 11, color: T.textSub }}>{t('uniqueUsers')}<b style={{ color: GOLD }}>{uniqueDevices}</b>{t('people')}</span>
                 </div>
-                <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 3 }}>
+                <div style={{ fontSize: 9, color: T.textDimmer, marginTop: 3 }}>
                   {t('lastAccess')}{new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                 </div>
               </div>
@@ -1374,11 +1393,11 @@ export default function App() {
       {/* 履歴パネル */}
       {showHistory && (
         <div style={{
-          background: "#0a160a", borderBottom: "1px solid #2a4a2a",
+          background: T.bgDeep, borderBottom: `1px solid ${T.border}`,
           maxHeight: 320, overflowY: "auto",
         }}>
           {/* 共有コード入力 */}
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid #1a3a1a", display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ padding: "10px 16px", borderBottom: `1px solid ${T.borderDim}`, display: "flex", gap: 6, alignItems: "center" }}>
             <input
               value={shareInput}
               onChange={e => setShareInput(e.target.value.toUpperCase())}
@@ -1386,8 +1405,8 @@ export default function App() {
               maxLength={6}
               style={{
                 flex: 1, padding: "6px 8px", borderRadius: 6,
-                background: "#1a2e1a", border: "1px solid #2a4a2a",
-                color: "#f5f0e8", fontSize: 13, outline: "none",
+                background: T.bg, border: `1px solid ${T.border}`,
+                color: T.text, fontSize: 13, outline: "none",
                 letterSpacing: 3, textAlign: "center",
               }}
             />
@@ -1396,7 +1415,7 @@ export default function App() {
               disabled={shareInput.trim().length !== 6}
               style={{
                 padding: "6px 14px", borderRadius: 6,
-                border: `1px solid ${shareInput.trim().length === 6 ? GOLD : "#2a4a2a"}`,
+                border: `1px solid ${shareInput.trim().length === 6 ? GOLD : T.border}`,
                 background: "transparent",
                 color: shareInput.trim().length === 6 ? GOLD : "#3a5a3a",
                 fontSize: 12, cursor: shareInput.trim().length === 6 ? "pointer" : "default",
@@ -1411,23 +1430,23 @@ export default function App() {
             </div>
           )}
           {(isAdminMode ? adminSessionList : historyList).length === 0 ? (
-            <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>{t('noRecords')}</div>
+            <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: T.textDimmer }}>{t('noRecords')}</div>
           ) : (isAdminMode ? adminSessionList : historyList).map(s => (
             <div key={s.id} onClick={() => loadSessionById(s.id)} style={{
-              padding: "10px 16px", borderBottom: "1px solid #1a2a1a",
+              padding: "10px 16px", borderBottom: `1px solid ${T.borderDark}`,
               cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
               gap: 8,
             }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12, color: "#c8d8c8", marginBottom: 2 }}>
+                <div style={{ fontSize: 12, color: T.textSub, marginBottom: 2 }}>
                   {s.course_name || t('noCourse')}
                 </div>
-                <div style={{ fontSize: 9, color: "#4a6a4a" }}>
+                <div style={{ fontSize: 9, color: T.textDimmer }}>
                   {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
                   {isAdminMode && <span style={{ color: "#6a4a2a", marginLeft: 4 }}>device: {(s as any).device_id?.slice(0, 8)}</span>}
                 </div>
               </div>
-              <div style={{ fontSize: 9, color: "#6b8b6b", flexShrink: 0 }}>
+              <div style={{ fontSize: 9, color: T.textDim, flexShrink: 0 }}>
                 {s.names.slice(0, s.mode).join(" / ")}
               </div>
               {!isAdminMode && (
@@ -1447,7 +1466,7 @@ export default function App() {
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "12px 8px" }}>
         {/* Course name */}
-        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
+        <div style={{ background: T.bgCard, borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>GOLF COURSE</div>
           <div style={{ position: "relative", marginBottom: 4 }}>
             <input
@@ -1460,16 +1479,16 @@ export default function App() {
               style={{
                 width: "100%", boxSizing: "border-box",
                 padding: "6px 8px", textAlign: "left",
-                background: "#1a2e1a",
-                border: `1px solid ${courseName && !courseNameValid ? RED : courseNameValid ? GOLD : "#2a4a2a"}`,
-                borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                background: T.bg,
+                border: `1px solid ${courseName && !courseNameValid ? RED : courseNameValid ? GOLD : T.border}`,
+                borderRadius: 6, color: isSettingsLocked ? T.textDim : T.text, fontSize: 13, outline: "none",
                 opacity: isSettingsLocked ? 0.7 : 1,
               }}
             />
             {showSuggestions && courseSuggestions.length > 0 && (
               <div style={{
                 position: "absolute", top: "100%", left: 0, right: 0,
-                background: "#0f1f0f", border: `1px solid ${GOLD}`,
+                background: T.bgCard, border: `1px solid ${GOLD}`,
                 borderRadius: 6, zIndex: 100, maxHeight: 200, overflowY: "auto",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.6)", marginTop: 2,
               }}>
@@ -1479,9 +1498,9 @@ export default function App() {
                     onMouseDown={() => { setCourseName(name); setCourseNameValid(true); setShowSuggestions(false); }}
                     style={{
                       padding: "8px 10px", fontSize: 12, cursor: "pointer",
-                      borderBottom: "1px solid #1a3a1a", color: "#f5f0e8",
+                      borderBottom: `1px solid ${T.borderDim}`, color: T.text,
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#1a3a1a")}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.borderDim)}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >{name}</div>
                 ))}
@@ -1492,10 +1511,10 @@ export default function App() {
             <div style={{ fontSize: 9, color: RED, marginBottom: 4 }}>{t('courseNotFound')}</div>
           )}
           <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
+            <span style={{ fontSize: 10, color: T.textDim }}>{sessionDisplayDate}</span>
           </div>
           {/* 前半/後半ラベル */}
-          <div style={{ marginTop: 8, borderTop: "1px solid #1a3a1a", paddingTop: 8, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
+          <div style={{ marginTop: 8, borderTop: `1px solid ${T.borderDim}`, paddingTop: 8, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
             {([{half: t('frontHalf'), label: frontLabel, setLabel: setFrontLabel, offset: 0}, {half: t('backHalf'), label: backLabel, setLabel: setBackLabel, offset: 9}]).map(({half, label, setLabel, offset}, idx) => (
               <div key={idx} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
                 <span style={{ fontSize: 9, color: "#6a8a6a", minWidth: 26 }}>{half}</span>
@@ -1506,9 +1525,9 @@ export default function App() {
                     if (next && courseNameValid && !isReadOnly) { tryAutofillPars(next, offset); tryAutofillSI(next, offset); }
                   }} style={{
                     padding: "3px 8px", borderRadius: 10, fontSize: 10,
-                    border: `1px solid ${label === v ? GOLD : "#2a4a2a"}`,
+                    border: `1px solid ${label === v ? GOLD : T.border}`,
                     background: label === v ? "#2a1f00" : "transparent",
-                    color: label === v ? GOLD : "#6b8b6b",
+                    color: label === v ? GOLD : T.textDim,
                     cursor: "pointer",
                   }}>{v}</button>
                 ))}
@@ -1520,8 +1539,8 @@ export default function App() {
                   placeholder={t('freeLabel')}
                   style={{
                     flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
-                    background: "#0a160a", border: "1px solid #2a4a2a",
-                    color: "#f5f0e8", outline: "none",
+                    background: T.bgDeep, border: `1px solid ${T.border}`,
+                    color: T.text, outline: "none",
                   }}
                 />
               </div>
@@ -1530,17 +1549,17 @@ export default function App() {
         </div>
 
         {/* Player names */}
-        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
+        <div style={{ background: T.bgCard, borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>{t('players')}</div>
           <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>{t('orderDesc')}</div>
 
           {/* グループ管理UI（オーナーのみ） */}
           {!isParticipant && !isSharedView && !isViewing && (
-            <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #1a3a1a" }}>
+            <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${T.borderDim}` }}>
               {/* グループ選択（グループが存在する場合のみ表示） */}
               {groupList.length > 0 && !showGroupCreate && (
                 <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 8, color: "#6b8b6b", flexShrink: 0 }}>{t('group')}</span>
+                  <span style={{ fontSize: 8, color: T.textDim, flexShrink: 0 }}>{t('group')}</span>
                   {selectedGroupId ? (
                     <>
                       <span style={{ fontSize: 10, color: GOLD, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1569,8 +1588,8 @@ export default function App() {
                             onClick={() => applyGroup(g)}
                             style={{
                               flex: 1, padding: "3px 6px", fontSize: 10, textAlign: "left",
-                              background: "#1a2e1a", border: "1px solid #2a4a2a",
-                              borderRadius: 6, color: "#f5f0e8", cursor: "pointer",
+                              background: T.bg, border: `1px solid ${T.border}`,
+                              borderRadius: 6, color: T.text, cursor: "pointer",
                             }}
                           >{g.name}（{g.mode}人）</button>
                           <button
@@ -1596,8 +1615,8 @@ export default function App() {
                     placeholder={t('groupName')}
                     style={{
                       flex: 1, padding: "4px 6px", fontSize: 10, minWidth: 0,
-                      background: "#1a2e1a", border: "1px solid #2a4a6a",
-                      borderRadius: 6, color: "#f5f0e8", outline: "none",
+                      background: T.bg, border: "1px solid #2a4a6a",
+                      borderRadius: 6, color: T.text, outline: "none",
                     }}
                   />
                   <button
@@ -1605,14 +1624,14 @@ export default function App() {
                     disabled={!newGroupName.trim()}
                     style={{
                       padding: "4px 10px", fontSize: 8, borderRadius: 4, flexShrink: 0,
-                      border: `1px solid ${newGroupName.trim() ? GOLD : "#2a4a2a"}`,
+                      border: `1px solid ${newGroupName.trim() ? GOLD : T.border}`,
                       background: "transparent", color: newGroupName.trim() ? GOLD : "#3a5a3a",
                       cursor: newGroupName.trim() ? "pointer" : "default",
                     }}
                   >{t('save')}</button>
                   <button onClick={() => { setShowGroupCreate(false); setNewGroupName(""); }} style={{
                     padding: "4px 8px", fontSize: 8, borderRadius: 4, flexShrink: 0,
-                    border: "1px solid #2a3a2a", background: "transparent", color: "#4a6a4a", cursor: "pointer",
+                    border: `1px solid ${T.borderMid}`, background: "transparent", color: T.textDimmer, cursor: "pointer",
                   }}>✕</button>
                 </div>
               ) : (
@@ -1644,14 +1663,14 @@ export default function App() {
                       style={{
                         width: "100%", boxSizing: "border-box",
                         padding: "6px 2px", textAlign: "center",
-                        background: "#1a2e1a", border: "1px solid #2a4a2a",
-                        borderRadius: 6, color: isSettingsLocked ? "#6b8b6b" : "#f5f0e8", fontSize: 13, outline: "none",
+                        background: T.bg, border: `1px solid ${T.border}`,
+                        borderRadius: 6, color: isSettingsLocked ? T.textDim : T.text, fontSize: 13, outline: "none",
                         opacity: isSettingsLocked ? 0.7 : 1,
                       }}
                     />
                     {displayOpts.handicap && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-                        <span style={{ fontSize: 8, color: "#6b8b6b" }}>HC</span>
+                        <span style={{ fontSize: 8, color: T.textDim }}>HC</span>
                         <input
                           type="number"
                           min={0}
@@ -1661,8 +1680,8 @@ export default function App() {
                           disabled={isSettingsLocked}
                           style={{
                             width: 32, padding: "2px 2px", textAlign: "center",
-                            background: "#0a160a", border: "1px solid #2a4a2a",
-                            borderRadius: 4, color: "#f5f0e8", fontSize: 10, outline: "none",
+                            background: T.bgDeep, border: `1px solid ${T.border}`,
+                            borderRadius: 4, color: T.text, fontSize: 10, outline: "none",
                           }}
                         />
                       </div>
@@ -1671,7 +1690,7 @@ export default function App() {
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                         {token ? (
                           <>
-                            <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
+                            <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: T.text, textAlign: "center" }}>{token}</div>
                             {expiresAt && (
                               <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
                                 {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}{t('expiresAt')}
@@ -1715,7 +1734,7 @@ export default function App() {
 
         {/* 4人チーム分け */}
         {lvMode && (
-        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
+        <div style={{ background: T.bgCard, borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>{t('teamDiv')}</div>
           {(isParticipant || isSharedView || isAdminMode) && (
             <div style={{ fontSize: 8, color: "#4a7a4a", marginBottom: 4, letterSpacing: 0.5 }}>{t('localOnlyNote')}</div>
@@ -1736,9 +1755,9 @@ export default function App() {
                   else setTeamMode(id);
                 }} style={{
                   padding: "7px 4px", borderRadius: 8,
-                  border: `1.5px solid ${active ? GOLD : "#2a4a2a"}`,
+                  border: `1.5px solid ${active ? GOLD : T.border}`,
                   background: active ? "#2a1f00" : "transparent",
-                  color: active ? GOLD : "#6b8b6b",
+                  color: active ? GOLD : T.textDim,
                   fontSize: 9, cursor: "pointer",
                   fontWeight: active ? "bold" : "normal",
                   whiteSpace: "pre-line", lineHeight: 1.4,
@@ -1754,7 +1773,7 @@ export default function App() {
 
         {/* Options */}
         {lvMode && (
-        <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
+        <div style={{ background: T.bgCard, borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>{t('options')}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
             {(isParticipant || isSharedView || isAdminMode) && (
@@ -1776,16 +1795,16 @@ export default function App() {
                 }
               }} style={{
                 padding: "4px 11px", borderRadius: 20,
-                border: `1.5px solid ${displayOpts[k] ? GOLD : "#2a4a2a"}`,
+                border: `1.5px solid ${displayOpts[k] ? GOLD : T.border}`,
                 background: displayOpts[k] ? "#2a1f00" : "transparent",
-                color: displayOpts[k] ? GOLD : "#6b8b6b",
+                color: displayOpts[k] ? GOLD : T.textDim,
                 fontSize: 11, cursor: "pointer",
                 fontWeight: displayOpts[k] ? "bold" : "normal",
               }}>{l}</button>
             ))}
             {displayOpts.olympic && (
-              <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: "1px solid #1a3a1a" }}>
-                <span style={{ fontSize: 8, color: "#6b8b6b" }}>
+              <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: `1px solid ${T.borderDim}` }}>
+                <span style={{ fontSize: 8, color: T.textDim }}>
                   {t('ptsSetting')}{(isParticipant || isSharedView || isAdminMode) ? t('localOnly') : ""}:
                 </span>
                 {([
@@ -1802,8 +1821,8 @@ export default function App() {
                       onChange={e => setOlympicPts(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                       style={{
                         width: 32, padding: "2px 3px", fontSize: 10, textAlign: "center",
-                        background: "#1a2e1a", border: "1px solid #2a4a2a",
-                        borderRadius: 4, color: "#f5f0e8", outline: "none",
+                        background: T.bg, border: `1px solid ${T.border}`,
+                        borderRadius: 4, color: T.text, outline: "none",
                       }}
                     />
                   </div>
@@ -1815,13 +1834,13 @@ export default function App() {
         )}
 
         {/* Score grid */}
-        <div style={{ background: "#0f1f0f", borderRadius: 10, border: "1px solid #2a4a2a", overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#0a160a", borderBottom: "1px solid #2a4a2a" }}>
-            <div style={{ padding: "7px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>{frontLabel || "H"}</div>
+        <div style={{ background: T.bgCard, borderRadius: 10, border: `1px solid ${T.border}`, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: gridCols, background: T.bgDeep, borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ padding: "7px 2px", textAlign: "center", fontSize: 9, color: T.textDimmer }}>{frontLabel || "H"}</div>
             {Array.from({ length: n }, (_, i) => (
               <div key={i} style={{
                 padding: "7px 2px", textAlign: "center", fontSize: 11, fontWeight: "bold",
-                color: GOLD, borderLeft: "1px solid #2a4a2a",
+                color: GOLD, borderLeft: `1px solid ${T.border}`,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
                 {names[i]}
@@ -1841,10 +1860,10 @@ export default function App() {
             const [tA4] = mode === 4 ? getTeams4(h) : [[], []];
             return (
               <React.Fragment key={h}>
-              <div style={{ borderBottom: "1px solid #1a3a1a" }}>
+              <div style={{ borderBottom: `1px solid ${T.borderDim}` }}>
                 <div style={{
                   display: "grid", gridTemplateColumns: gridCols,
-                  background: h % 2 === 0 ? "#0f1f0f" : "#0b190b",
+                  background: h % 2 === 0 ? T.bgCard : T.bgAlt,
                 }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 2px" }}>
                     <span style={{ fontSize: 11, fontWeight: "bold", color: GOLD }}>{h + 1}</span>
@@ -1852,9 +1871,9 @@ export default function App() {
                       {[3, 4, 5].map(p => (
                         <button key={p} onClick={() => setPars(prev => prev.map((v, ph) => ph === h ? p : v))} style={{
                           padding: "1px 3px", fontSize: 7, borderRadius: 3,
-                          border: `1px solid ${pars[h] === p ? GOLD : "#2a4a2a"}`,
+                          border: `1px solid ${pars[h] === p ? GOLD : T.border}`,
                           background: pars[h] === p ? "#2a1f00" : "transparent",
-                          color: pars[h] === p ? GOLD : "#4a6a4a",
+                          color: pars[h] === p ? GOLD : T.textDimmer,
                           cursor: isReadOnly ? "default" : "pointer",
                         }}>{p}</button>
                       ))}
@@ -1864,7 +1883,7 @@ export default function App() {
                         value={pushCounts[h]}
                         onChange={e => setPushCounts(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
                         disabled={isReadOnly}
-                        style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#1a2e1a", border: "1px solid #2a4a2a", color: GOLD }}
+                        style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: T.bg, border: `1px solid ${T.border}`, color: GOLD }}
                       >
                         <option value={0}>P×0</option>
                         <option value={1}>P×1</option>
@@ -1876,7 +1895,7 @@ export default function App() {
                         value={strokeIndexes[h]}
                         onChange={e => setStrokeIndexes(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
                         disabled={isReadOnly}
-                        style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#0a160a", border: "1px solid #2a4a6a", color: "#4a9bdb" }}
+                        style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: T.bgDeep, border: "1px solid #2a4a6a", color: "#4a9bdb" }}
                       >
                         {Array.from({ length: 18 }, (_, i) => (
                           <option key={i + 1} value={i + 1}>SI{i + 1}</option>
@@ -1889,7 +1908,7 @@ export default function App() {
                     const sc = scores[h][pi];
                     const par = pars[h];
                     const numSc = Number(sc);
-                    let scoreColor = "#f5f0e8";
+                    let scoreColor = T.text;
                     if (sc !== "") {
                       if (numSc <= par - 1) scoreColor = "#fbbf24";
                       else if (numSc === par) scoreColor = GREEN;
@@ -1922,7 +1941,7 @@ export default function App() {
                               }`,
                               borderRadius: 6,
                               fontSize: 17, fontWeight: "bold",
-                              color: sc ? scoreColor : "#3a4a3a",
+                              color: sc ? scoreColor : DIM,
                               cursor: isReadOnly ? "default" : "pointer",
                               userSelect: "none",
                               minHeight: 32, display: "flex",
@@ -1955,7 +1974,7 @@ export default function App() {
                                       style={{
                                         padding: "1px 2px", fontSize: 7, lineHeight: 1,
                                         borderRadius: 3,
-                                        border: `1px solid ${selected ? color : takenByOther ? "#1a2a1a" : "#2a4a2a"}`,
+                                        border: `1px solid ${selected ? color : takenByOther ? T.borderDark : T.border}`,
                                         background: selected ? color + "33" : "transparent",
                                         color: selected ? color : takenByOther ? "#2a3a2a" : "#3a5a3a",
                                         cursor: takenByOther ? "default" : "pointer",
@@ -1985,8 +2004,8 @@ export default function App() {
                 </div>
 
                 {lvMode && r && !r.tied && (
-                  <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#080f08" }}>
-                    <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: "#3a5a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
+                  <div style={{ display: "grid", gridTemplateColumns: gridCols, background: T.bgDark }}>
+                    <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: T.textDimmer, display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = r.pts[pi];
                       return (
@@ -2002,7 +2021,7 @@ export default function App() {
                   </div>
                 )}
                 {lvMode && r && r.tied && (
-                  <div style={{ padding: "2px 8px", background: "#080f08", fontSize: 8, color: GOLD, textAlign: "center" }}>
+                  <div style={{ padding: "2px 8px", background: T.bgDark, fontSize: 8, color: GOLD, textAlign: "center" }}>
                     {t('tieNext')}{r.mult + 1}
                   </div>
                 )}
@@ -2013,8 +2032,8 @@ export default function App() {
                 <>
                   <div style={{
                     display: "grid", gridTemplateColumns: gridCols,
-                    background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
-                    borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
+                    background: T.bgScore, borderTop: `1px solid ${GOLD}`,
+                    borderBottom: displayOpts.olympic ? `1px solid ${T.borderMid}` : `2px solid ${GOLD}`,
                   }}>
                     <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
                       <span style={{ fontSize: 7 }}>{backLabel || t('backHalf')}</span>
@@ -2027,11 +2046,11 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
                           fontSize: 13, fontWeight: "bold",
-                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : "#f5f0e8",
+                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : T.text,
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                         }}>
                           {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
-                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
+                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: T.text, fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
                         </div>
                       );
                     })}
@@ -2039,7 +2058,7 @@ export default function App() {
                   {displayOpts.olympic && (
                     <div style={{
                       display: "grid", gridTemplateColumns: gridCols,
-                      background: "#090f09", borderBottom: `2px solid ${GOLD}`,
+                      background: T.bgOlympic, borderBottom: `2px solid ${GOLD}`,
                     }}>
                       <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>{t('olTotal')}</div>
                       {Array.from({ length: n }, (_, pi) => {
@@ -2064,8 +2083,8 @@ export default function App() {
                 <>
                   <div style={{
                     display: "grid", gridTemplateColumns: gridCols,
-                    background: "#0a1a0a", borderTop: `1px solid ${GOLD}`,
-                    borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
+                    background: T.bgScore, borderTop: `1px solid ${GOLD}`,
+                    borderBottom: displayOpts.olympic ? `1px solid ${T.borderMid}` : `2px solid ${GOLD}`,
                   }}>
                     <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
                       <span style={{ fontSize: 7 }}>{frontLabel || t('frontHalf')}</span>
@@ -2078,11 +2097,11 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
                           fontSize: 13, fontWeight: "bold",
-                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : "#f5f0e8",
+                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : T.text,
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                         }}>
                           {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
-                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
+                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: T.text, fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
                         </div>
                       );
                     })}
@@ -2090,7 +2109,7 @@ export default function App() {
                   {displayOpts.olympic && (
                     <div style={{
                       display: "grid", gridTemplateColumns: gridCols,
-                      background: "#090f09", borderBottom: `2px solid ${GOLD}`,
+                      background: T.bgOlympic, borderBottom: `2px solid ${GOLD}`,
                     }}>
                       <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>{t('olTotal')}</div>
                       {Array.from({ length: n }, (_, pi) => {
@@ -2112,11 +2131,11 @@ export default function App() {
               {h === 8 && backLabel && (
                 <div style={{
                   display: "grid", gridTemplateColumns: gridCols,
-                  background: "#0a160a", borderBottom: "1px solid #2a4a2a",
+                  background: T.bgDeep, borderBottom: `1px solid ${T.border}`,
                 }}>
-                  <div style={{ padding: "4px 2px", textAlign: "center", fontSize: 9, color: "#4a6a4a" }}>{backLabel}</div>
+                  <div style={{ padding: "4px 2px", textAlign: "center", fontSize: 9, color: T.textDimmer }}>{backLabel}</div>
                   {Array.from({ length: n }, (_, i) => (
-                    <div key={i} style={{ borderLeft: "1px solid #2a4a2a" }} />
+                    <div key={i} style={{ borderLeft: `1px solid ${T.border}` }} />
                   ))}
                 </div>
               )}
@@ -2126,15 +2145,15 @@ export default function App() {
         </div>
 
         {/* Totals */}
-        <div style={{ background: "#0a160a", borderRadius: 10, padding: "14px 16px", border: `2px solid ${GOLD}` }}>
+        <div style={{ background: T.bgDeep, borderRadius: 10, padding: "14px 16px", border: `2px solid ${GOLD}` }}>
           <div style={{ fontSize: 9, letterSpacing: 3, color: GOLD, textAlign: "center", marginBottom: 10 }}>FINAL SCORE</div>
           {Array.from({ length: n }, (_, pi) => (
             <div key={pi} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: "8px 0",
-              borderBottom: pi < n - 1 ? "1px solid #1a3a1a" : "none",
+              borderBottom: pi < n - 1 ? `1px solid ${T.borderDim}` : "none",
             }}>
-              <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
+              <span style={{ fontSize: 14, color: T.textSub }}>{names[pi]}</span>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                 <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
                   {lvMode && (
@@ -2146,7 +2165,7 @@ export default function App() {
                   </span>
                   )}
                   {grossTotals[pi] > 0 && (
-                    <span style={{ fontSize: lvMode ? 11 : 20, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold" }}>
+                    <span style={{ fontSize: lvMode ? 11 : 20, color: T.text, fontWeight: lvMode ? "normal" : "bold" }}>
                       {lvMode ? `(${grossTotals[pi]})` : grossTotals[pi]}
                     </span>
                   )}
@@ -2165,9 +2184,9 @@ export default function App() {
             <>
               <div style={{
                 margin: "12px 0 10px",
-                borderTop: "1px solid #2a4a2a",
+                borderTop: `1px solid ${T.border}`,
                 paddingTop: 10,
-                fontSize: 9, letterSpacing: 3, color: "#6b8b6b", textAlign: "center",
+                fontSize: 9, letterSpacing: 3, color: T.textDim, textAlign: "center",
               }}>
                 {t('settlement')}
               </div>
@@ -2175,7 +2194,7 @@ export default function App() {
                 <div key={i} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: "7px 0",
-                  borderBottom: i < settlement.length - 1 ? "1px solid #1a2a1a" : "none",
+                  borderBottom: i < settlement.length - 1 ? `1px solid ${T.borderDark}` : "none",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <span style={{
@@ -2188,7 +2207,7 @@ export default function App() {
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80,
                     }}>{names[tx.to]}</span>
                   </div>
-                  <span style={{ fontSize: 17, fontWeight: "bold", color: "#f5f0e8", flexShrink: 0 }}>
+                  <span style={{ fontSize: 17, fontWeight: "bold", color: T.text, flexShrink: 0 }}>
                     {tx.amount}
                   </span>
                 </div>
@@ -2198,7 +2217,7 @@ export default function App() {
         </div>
 
         {lvMode && (
-        <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
+        <div style={{ textAlign: "center", fontSize: 8, color: T.textDimmer, marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
             ? `${t('rule3p')}${t(('tm_' + (displayTeamMode || 'order_1_23')) as I18nKey).replace(/\n/g, " ")}`
             : `${t('rule4p')}${t(('tm_' + (displayTeamMode || 'order_14_23')) as I18nKey).replace(/\n/g, " ")}`}
@@ -2213,9 +2232,9 @@ export default function App() {
               disabled={!canSave || saving}
               style={{
                 padding: "12px 40px", borderRadius: 24,
-                border: `1.5px solid ${canSave ? GREEN : "#2a4a2a"}`,
+                border: `1.5px solid ${canSave ? GREEN : T.border}`,
                 background: canSave ? "rgba(74,155,127,0.15)" : "transparent",
-                color: canSave ? GREEN : "#2a4a2a",
+                color: canSave ? GREEN : T.border,
                 fontSize: 14, fontWeight: "bold", letterSpacing: 1,
                 cursor: canSave ? "pointer" : "default",
               }}
@@ -2239,7 +2258,7 @@ export default function App() {
                     title={tip}
                     style={{
                       padding: "6px 16px", borderRadius: 20,
-                      border: `1px solid ${enabled ? "#2a4a6a" : "#1a2a1a"}`,
+                      border: `1px solid ${enabled ? "#2a4a6a" : T.borderDark}`,
                       background: "transparent",
                       color: enabled ? "#4a7a9b" : "#2a3a2a",
                       fontSize: 11, cursor: enabled ? "pointer" : "default", letterSpacing: 1,
@@ -2253,10 +2272,10 @@ export default function App() {
             })()}
             {viewCode && (
               <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
+                <div style={{ padding: "10px 16px", background: T.bgDeep, borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
                   <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>{t('viewCodeLabel')}</div>
-                  <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
-                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>{t('reissueNote')}</div>
+                  <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: T.text }}>{viewCode}</div>
+                  <div style={{ fontSize: 9, color: T.textDimmer, marginTop: 4 }}>{t('reissueNote')}</div>
                 </div>
               </div>
             )}
@@ -2264,17 +2283,17 @@ export default function App() {
               const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
               const last = accessLogs[0];
               return (
-                <div style={{ marginTop: 8, padding: "8px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
-                  <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 4 }}>{t('accessStats')}</div>
+                <div style={{ marginTop: 8, padding: "8px 12px", background: T.bgDark, borderRadius: 8, border: `1px solid ${T.borderDim}` }}>
+                  <div style={{ fontSize: 9, color: T.textDim, letterSpacing: 1, marginBottom: 4 }}>{t('accessStats')}</div>
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, color: "#c8d8c8" }}>
+                    <span style={{ fontSize: 11, color: T.textSub }}>
                       {t('totalAccess')}<b style={{ color: GOLD }}>{accessLogs.length}</b>{t('times')}
                     </span>
-                    <span style={{ fontSize: 11, color: "#c8d8c8" }}>
+                    <span style={{ fontSize: 11, color: T.textSub }}>
                       {t('uniqueUsers')}<b style={{ color: GOLD }}>{uniqueDevices}</b>{t('people')}
                     </span>
                   </div>
-                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>
+                  <div style={{ fontSize: 9, color: T.textDimmer, marginTop: 4 }}>
                     {t('lastAccess')}{new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                   </div>
                 </div>
@@ -2292,13 +2311,13 @@ export default function App() {
           zIndex: 400,
         }}>
           <div style={{
-            background: "#0f1f0f", border: `2px solid ${GOLD}`,
+            background: T.bgCard, border: `2px solid ${GOLD}`,
             borderRadius: 12, padding: "28px 24px", width: "min(320px, 90vw)",
             textAlign: "center",
           }}>
             <div style={{ fontSize: 10, color: GOLD, letterSpacing: 3, marginBottom: 8 }}>WELCOME</div>
             <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 6 }}>{t('welcome')}</div>
-            <div style={{ fontSize: 10, color: "#6b8b6b", marginBottom: 20 }}>
+            <div style={{ fontSize: 10, color: T.textDim, marginBottom: 20 }}>
               {t('welcomeSub')}
             </div>
             <input
@@ -2309,8 +2328,8 @@ export default function App() {
               autoFocus
               style={{
                 width: "100%", padding: "8px 10px", fontSize: 14, boxSizing: "border-box",
-                background: "#1a2e1a", border: `1px solid ${GOLD}`,
-                borderRadius: 8, color: "#f5f0e8", outline: "none", marginBottom: 12,
+                background: T.bg, border: `1px solid ${GOLD}`,
+                borderRadius: 8, color: T.text, outline: "none", marginBottom: 12,
               }}
             />
             <button
@@ -2319,7 +2338,7 @@ export default function App() {
               style={{
                 width: "100%", padding: "10px 0", fontSize: 14, fontWeight: "bold",
                 borderRadius: 8, cursor: nameInput.trim() ? "pointer" : "default",
-                border: `1px solid ${nameInput.trim() ? GOLD : "#2a4a2a"}`,
+                border: `1px solid ${nameInput.trim() ? GOLD : T.border}`,
                 background: nameInput.trim() ? "#2a1f00" : "transparent",
                 color: nameInput.trim() ? GOLD : "#3a5a3a",
               }}
@@ -2336,11 +2355,11 @@ export default function App() {
           zIndex: 400, overflowY: "auto", padding: "20px 0",
         }}>
           <div style={{
-            background: "#0f1f0f", border: `2px solid ${GOLD}`,
+            background: T.bgCard, border: `2px solid ${GOLD}`,
             borderRadius: 12, width: "min(400px, 92vw)", overflow: "hidden",
           }}>
             <div style={{
-              padding: "16px 16px 12px", borderBottom: "1px solid #2a4a2a",
+              padding: "16px 16px 12px", borderBottom: `1px solid ${T.border}`,
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
               <div>
@@ -2348,13 +2367,13 @@ export default function App() {
                 <div style={{ fontSize: 14, fontWeight: "bold" }}>{leaderboardGroupName}</div>
               </div>
               <button onClick={() => setShowLeaderboard(false)} style={{
-                background: "transparent", border: "none", color: "#6b8b6b",
+                background: "transparent", border: "none", color: T.textDim,
                 fontSize: 18, cursor: "pointer", padding: "4px 8px",
               }}>✕</button>
             </div>
             <div style={{ padding: "8px 0" }}>
               {leaderboardData.length === 0 ? (
-                <div style={{ padding: "24px", textAlign: "center", color: "#4a6a4a", fontSize: 12 }}>
+                <div style={{ padding: "24px", textAlign: "center", color: T.textDimmer, fontSize: 12 }}>
                   {t('noData')}
                 </div>
               ) : leaderboardData.map((entry, rank) => {
@@ -2364,20 +2383,20 @@ export default function App() {
                   <div key={entry.player_name} style={{
                     display: "flex", alignItems: "center",
                     padding: "10px 16px",
-                    borderBottom: rank < leaderboardData.length - 1 ? "1px solid #1a3a1a" : "none",
+                    borderBottom: rank < leaderboardData.length - 1 ? `1px solid ${T.borderDim}` : "none",
                     background: isTop ? "rgba(200,169,110,0.06)" : "transparent",
                   }}>
-                    <span style={{ fontSize: 12, color: isTop ? GOLD : "#4a6a4a", width: 20, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, color: isTop ? GOLD : T.textDimmer, width: 20, flexShrink: 0 }}>
                       {rank + 1}
                     </span>
                     <span style={{ flex: 1, fontSize: 14, fontWeight: isTop ? "bold" : "normal" }}>
                       {entry.player_name}
                     </span>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 16, fontWeight: "bold", color: pts > 0 ? GOLD : pts < 0 ? RED : "#f5f0e8" }}>
+                      <div style={{ fontSize: 16, fontWeight: "bold", color: pts > 0 ? GOLD : pts < 0 ? RED : T.text }}>
                         {pts > 0 ? `+${pts}` : `${pts}`}
                       </div>
-                      <div style={{ fontSize: 9, color: "#4a6a4a" }}>
+                      <div style={{ fontSize: 9, color: T.textDimmer }}>
                         {entry.session_count}{t('rounds')}
                         {entry.last_played ? ` · ${formatDate(entry.last_played)}` : ""}
                       </div>
@@ -2394,7 +2413,7 @@ export default function App() {
       {activeCell && !isReadOnly && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: "#0f1f0f", borderTop: `2px solid ${GOLD}`,
+          background: T.bgCard, borderTop: `2px solid ${GOLD}`,
           padding: "8px 12px 12px", zIndex: 300,
           display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6,
           maxWidth: 520, margin: "0 auto",
@@ -2406,9 +2425,9 @@ export default function App() {
               style={{
                 padding: "14px 0", borderRadius: 8, fontSize: 20, fontWeight: "bold",
                 cursor: "pointer", userSelect: "none",
-                background: key === "✕" ? "#1a0a0a" : "#1a2e1a",
-                border: `1px solid ${key === "✕" ? RED : "#2a4a2a"}`,
-                color: key === "✕" ? RED : key === "⌫" ? GOLD : "#f5f0e8",
+                background: key === "✕" ? "#1a0a0a" : T.bg,
+                border: `1px solid ${key === "✕" ? RED : T.border}`,
+                color: key === "✕" ? RED : key === "⌫" ? GOLD : T.text,
               }}
             >{key}</button>
           ))}
