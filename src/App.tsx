@@ -323,14 +323,16 @@ export default function App() {
     fetch("https://api.ipify.org?format=json").catch(() => null)
       .then(r => r ? r.json() : { ip: null })
       .then(async ({ ip }) => {
-        await supabase.from("site_access_logs").insert({
+        const { error: logErr } = await supabase.from("site_access_logs").insert({
           device_id: deviceId,
           ip_address: ip,
           user_agent: navigator.userAgent,
           url_params: urlParams,
         });
+        if (logErr) console.error("[site_access_logs]", logErr);
         // 訪問者サマリー更新（デバイス × IP の新規 or カウント+1）
-        await supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
+        const { error: visitErr } = await supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
+        if (visitErr) console.error("[record_site_visit]", visitErr);
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
