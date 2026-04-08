@@ -328,8 +328,12 @@ export default function App() {
 
   // モード切り替え（teamMode をそのモードのデフォルトにリセット）
   function handleModeChange(m: 3 | 4) {
+    if (opts.olympic && olympicMedals.some(row => row.some(v => v !== null))) {
+      if (!window.confirm("人数を変えるとオリンピックのメダル入力がリセットされます。よろしいですか？")) return;
+    }
     setMode(m);
     setTeamMode(m === 3 ? "order_1_23" : "order_14_23");
+    setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
   }
 
   // 履歴削除
