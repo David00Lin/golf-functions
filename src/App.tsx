@@ -1524,9 +1524,9 @@ export default function App() {
                           <div key={pi} style={{
                             ...cell, padding: "3px 3px", textAlign: "center",
                             fontSize: 11, fontWeight: "bold",
-                            color: pt > 0 ? "#f5c842" : DIM,
+                            color: pt > 0 ? "#f5c842" : pt < 0 ? RED : DIM,
                           }}>
-                            {pt > 0 ? `+${pt}` : "-"}
+                            {pt > 0 ? `+${pt}` : pt < 0 ? `${pt}` : "-"}
                           </div>
                         );
                       })}
@@ -1575,9 +1575,9 @@ export default function App() {
                           <div key={pi} style={{
                             ...cell, padding: "3px 3px", textAlign: "center",
                             fontSize: 11, fontWeight: "bold",
-                            color: pt > 0 ? "#f5c842" : DIM,
+                            color: pt > 0 ? "#f5c842" : pt < 0 ? RED : DIM,
                           }}>
-                            {pt > 0 ? `+${pt}` : "-"}
+                            {pt > 0 ? `+${pt}` : pt < 0 ? `${pt}` : "-"}
                           </div>
                         );
                       })}
