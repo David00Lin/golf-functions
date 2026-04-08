@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import type { Opts, Group } from "./types";
+import type { Opts, Group, LeaderboardEntry } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
 import { getSessionId, getDeviceId, newSession } from "./lib/session";
@@ -212,6 +212,12 @@ export default function App() {
   const [groupList, setGroupList] = useState<Group[]>([]);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [showNameRegistration, setShowNameRegistration] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardGroupName, setLeaderboardGroupName] = useState("");
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
@@ -279,6 +285,19 @@ export default function App() {
         });
         // 訪問者サマリー更新（デバイス × 日次 × IP の新規組み合わせのみカウント）
         supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 初回アクセス時にユーザー名を確認・未登録なら登録モーダルを表示
+  useEffect(() => {
+    supabase.from("device_profiles").select("display_name")
+      .eq("device_id", getDeviceId()).maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setDisplayName(data.display_name);
+        } else {
+          setShowNameRegistration(true);
+        }
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -432,6 +451,20 @@ export default function App() {
       .then(({ data }) => { setGroupList((data ?? []) as Group[]); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // names[] がグループのメンバー構成と完全一致したら自動でグループを選択
+  useEffect(() => {
+    if (selectedGroupId || groupList.length === 0 || isSettingsLocked) return;
+    const sessionNames = names.slice(0, n).map(nm => nm.trim()).sort();
+    if (sessionNames.some(nm => /^Player\d+$/.test(nm) || nm === "")) return;
+    const match = groupList.find(g => {
+      if (g.mode !== n) return false;
+      const gNames = [...g.member_names].sort();
+      return gNames.length === sessionNames.length &&
+        JSON.stringify(gNames) === JSON.stringify(sessionNames);
+    });
+    if (match) setSelectedGroupId(match.id);
+  }, [names, n, groupList, selectedGroupId, isSettingsLocked]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
     if (isDirty && !window.confirm("現在の入力内容は保存されません。過去の記録を表示しますか？")) return;
@@ -512,6 +545,27 @@ export default function App() {
     setNewGroupName("");
   }
 
+  // 初回名前登録
+  async function registerDisplayName(name: string) {
+    const { error } = await supabase.from("device_profiles").upsert({
+      device_id: getDeviceId(),
+      display_name: name,
+    });
+    if (error) { alert(`名前の登録に失敗しました: ${error.message}`); return; }
+    setDisplayName(name);
+    setNames(prev => prev.map((n, i) => i === 0 && /^Player\d+$/.test(n) ? name : n));
+    setShowNameRegistration(false);
+    setNameInput("");
+  }
+
+  // リーダーボード取得
+  async function fetchLeaderboard(groupId: string, groupName: string) {
+    const { data } = await supabase.rpc("get_group_leaderboard", { p_group_id: groupId });
+    setLeaderboardData((data as LeaderboardEntry[]) ?? []);
+    setLeaderboardGroupName(groupName);
+    setShowLeaderboard(true);
+  }
+
   // 履歴削除
   async function deleteSessionById(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -544,7 +598,7 @@ export default function App() {
     setSessionId(id);
     setMode(4);
     setCourseName("");
-    setNames(["Player1", "Player2", "Player3", "Player4"]);
+    setNames(displayName ? [displayName, "Player2", "Player3", "Player4"] : ["Player1", "Player2", "Player3", "Player4"]);
     setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setPars(Array(HOLES).fill(4));
     setOpts({ carry: false, birdieReverse: false, truncate: false, push: false, olympic: false });
@@ -1341,6 +1395,16 @@ export default function App() {
                       <span style={{ fontSize: 10, color: GOLD, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         ✓ {groupList.find(g => g.id === selectedGroupId)?.name ?? ""}
                       </span>
+                      <button
+                        onClick={() => {
+                          const g = groupList.find(g => g.id === selectedGroupId);
+                          if (g) fetchLeaderboard(g.id, g.name);
+                        }}
+                        style={{
+                          padding: "2px 8px", fontSize: 8, borderRadius: 10, flexShrink: 0,
+                          border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, cursor: "pointer",
+                        }}
+                      >順位</button>
                       <button onClick={() => setSelectedGroupId(null)} style={{
                         padding: "2px 8px", fontSize: 8, borderRadius: 10, flexShrink: 0,
                         border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer",
@@ -2019,6 +2083,112 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* 名前登録モーダル（初回アクセス時） */}
+      {showNameRegistration && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 400,
+        }}>
+          <div style={{
+            background: "#0f1f0f", border: `2px solid ${GOLD}`,
+            borderRadius: 12, padding: "28px 24px", width: "min(320px, 90vw)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 10, color: GOLD, letterSpacing: 3, marginBottom: 8 }}>WELCOME</div>
+            <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 6 }}>あなたの名前を教えてください</div>
+            <div style={{ fontSize: 10, color: "#6b8b6b", marginBottom: 20 }}>
+              リーダーボードで使用されます
+            </div>
+            <input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && nameInput.trim()) registerDisplayName(nameInput.trim()); }}
+              placeholder="例: 山田、タロウ"
+              autoFocus
+              style={{
+                width: "100%", padding: "8px 10px", fontSize: 14, boxSizing: "border-box",
+                background: "#1a2e1a", border: `1px solid ${GOLD}`,
+                borderRadius: 8, color: "#f5f0e8", outline: "none", marginBottom: 12,
+              }}
+            />
+            <button
+              onClick={() => { if (nameInput.trim()) registerDisplayName(nameInput.trim()); }}
+              disabled={!nameInput.trim()}
+              style={{
+                width: "100%", padding: "10px 0", fontSize: 14, fontWeight: "bold",
+                borderRadius: 8, cursor: nameInput.trim() ? "pointer" : "default",
+                border: `1px solid ${nameInput.trim() ? GOLD : "#2a4a2a"}`,
+                background: nameInput.trim() ? "#2a1f00" : "transparent",
+                color: nameInput.trim() ? GOLD : "#3a5a3a",
+              }}
+            >決定</button>
+          </div>
+        </div>
+      )}
+
+      {/* リーダーボードパネル */}
+      {showLeaderboard && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          zIndex: 400, overflowY: "auto", padding: "20px 0",
+        }}>
+          <div style={{
+            background: "#0f1f0f", border: `2px solid ${GOLD}`,
+            borderRadius: 12, width: "min(400px, 92vw)", overflow: "hidden",
+          }}>
+            <div style={{
+              padding: "16px 16px 12px", borderBottom: "1px solid #2a4a2a",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ fontSize: 9, color: GOLD, letterSpacing: 2, marginBottom: 2 }}>LEADERBOARD</div>
+                <div style={{ fontSize: 14, fontWeight: "bold" }}>{leaderboardGroupName}</div>
+              </div>
+              <button onClick={() => setShowLeaderboard(false)} style={{
+                background: "transparent", border: "none", color: "#6b8b6b",
+                fontSize: 18, cursor: "pointer", padding: "4px 8px",
+              }}>✕</button>
+            </div>
+            <div style={{ padding: "8px 0" }}>
+              {leaderboardData.length === 0 ? (
+                <div style={{ padding: "24px", textAlign: "center", color: "#4a6a4a", fontSize: 12 }}>
+                  まだデータがありません
+                </div>
+              ) : leaderboardData.map((entry, rank) => {
+                const pts = entry.total_pts;
+                const isTop = rank === 0;
+                return (
+                  <div key={entry.player_name} style={{
+                    display: "flex", alignItems: "center",
+                    padding: "10px 16px",
+                    borderBottom: rank < leaderboardData.length - 1 ? "1px solid #1a3a1a" : "none",
+                    background: isTop ? "rgba(200,169,110,0.06)" : "transparent",
+                  }}>
+                    <span style={{ fontSize: 12, color: isTop ? GOLD : "#4a6a4a", width: 20, flexShrink: 0 }}>
+                      {rank + 1}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: isTop ? "bold" : "normal" }}>
+                      {entry.player_name}
+                    </span>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 16, fontWeight: "bold", color: pts > 0 ? GOLD : pts < 0 ? RED : "#f5f0e8" }}>
+                        {pts > 0 ? `+${pts}` : `${pts}`}
+                      </div>
+                      <div style={{ fontSize: 9, color: "#4a6a4a" }}>
+                        {entry.session_count}ラウンド
+                        {entry.last_played ? ` · ${formatDate(entry.last_played)}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* テンキー */}
       {activeCell && !isReadOnly && (
