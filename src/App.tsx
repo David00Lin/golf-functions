@@ -3,7 +3,7 @@ import type { Opts, Group, LeaderboardEntry } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
 import { getSessionId, getDeviceId, newSession } from "./lib/session";
-import { i18n, type Lang, type I18nKey } from "./i18n";
+import { i18n, getLangFromPath, type Lang, type I18nKey } from "./i18n";
 
 const HOLES = 18;
 const PAR_AUTOFILL_THRESHOLD = 2;
@@ -243,7 +243,7 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [leaderboardGroupName, setLeaderboardGroupName] = useState("");
-  const [lang, setLang] = useState<Lang>("ja");
+  const [lang] = useState<Lang>(getLangFromPath);
   const t = (key: I18nKey) => i18n[lang][key];
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
@@ -259,6 +259,7 @@ export default function App() {
       const { data } = await supabase
         .from("courses").select("name")
         .ilike("name", `%${courseName.trim()}%`)
+        .eq("lang", lang)
         .limit(8);
       const list = data?.map(d => d.name) ?? [];
       setCourseSuggestions(list);
@@ -270,7 +271,7 @@ export default function App() {
   // par 自動入力ヘルパー
   async function tryAutofillPars(label: string, holeOffset: number) {
     const { data: course } = await supabase
-      .from("courses").select("id").ilike("name", courseName).maybeSingle();
+      .from("courses").select("id").ilike("name", courseName).eq("lang", lang).maybeSingle();
     if (!course) return;
     const { data } = await supabase
       .from("course_sections").select("pars")
@@ -291,7 +292,7 @@ export default function App() {
 
   async function tryAutofillSI(label: string, holeOffset: number) {
     const { data: course } = await supabase
-      .from("courses").select("id").ilike("name", courseName).maybeSingle();
+      .from("courses").select("id").ilike("name", courseName).eq("lang", lang).maybeSingle();
     if (!course) return;
     const { data } = await supabase
       .from("course_sections").select("stroke_indexes")
@@ -1167,10 +1168,10 @@ export default function App() {
       try {
         // courses: 同名コースがなければ insert（あれば select）
         let { data: course } = await supabase
-          .from("courses").select("id").ilike("name", courseName.trim()).maybeSingle();
+          .from("courses").select("id").ilike("name", courseName.trim()).eq("lang", lang).maybeSingle();
         if (!course) {
           const res = await supabase
-            .from("courses").insert({ name: courseName.trim() }).select("id").single();
+            .from("courses").insert({ name: courseName.trim(), lang }).select("id").single();
           course = res.data;
         }
         if (course) {
@@ -1212,7 +1213,7 @@ export default function App() {
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
-        <button onClick={() => setLang(l => l === "ja" ? "zh" : "ja")} style={{
+        <button onClick={() => { window.location.href = lang === "ja" ? "/zh/" : "/"; }} style={{
           position: "absolute", top: 14, right: 44,
           background: lang === "zh" ? "#2a1f00" : "transparent",
           border: `1px solid ${lang === "zh" ? GOLD : "#2a4a2a"}`,

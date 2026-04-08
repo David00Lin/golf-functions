@@ -1,5 +1,9 @@
 export type Lang = "ja" | "zh";
 
+export function getLangFromPath(): Lang {
+  return window.location.pathname.startsWith("/zh") ? "zh" : "ja";
+}
+
 const ja = {
   // Header / Navigation
   newGame: "新ゲーム",
