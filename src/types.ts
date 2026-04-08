@@ -4,6 +4,7 @@ export interface Opts {
   truncate: boolean;
   push: boolean;
   olympic: boolean;
+  handicap: boolean;
 }
 
 export interface Group {

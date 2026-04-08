@@ -50,6 +50,23 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", ...JST });
 }
 
+// ── ハンディキャップ: ストローク配分（差分方式） ──────────────────────────
+function computeHandicapStrokes(
+  handicaps: number[], strokeIndexes: number[], n: number
+): number[][] {
+  const activeHCs = handicaps.slice(0, n);
+  const minHC = Math.min(...activeHCs);
+  const diffs = activeHCs.map(hc => hc - minHC);
+  return Array.from({ length: n }, (_, pi) => {
+    const diff = diffs[pi];
+    return strokeIndexes.map(si => {
+      const full = Math.floor(diff / 18);
+      const rem = diff % 18;
+      return full + (si <= rem ? 1 : 0);
+    });
+  });
+}
+
 // ── canonical totals 計算用の純粋関数群（displayOpts に依存しない） ──────────
 
 function computeOrdersStatic(scores: string[][], n: number): number[][] {
@@ -88,11 +105,14 @@ function computeCanonicalTotals(
   opts: Opts,
   teamMode: string,
   mode: 3 | 4,
-  pushCounts: number[]
+  pushCounts: number[],
+  handicaps: number[],
+  strokeIndexes: number[]
 ): number[] {
   const n = mode;
   const orders = computeOrdersStatic(scores, n);
   const t = Array(4).fill(0);
+  const strokes = opts.handicap ? computeHandicapStrokes(handicaps, strokeIndexes, n) : null;
 
   if (mode === 3) {
     let carry = 1;
@@ -105,8 +125,8 @@ function computeCanonicalTotals(
       else if (teamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
       else if (teamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
       else                                { solo = order[0]; pair = [order[1], order[2]]; }
-      const ss = Number(s[solo]);
-      const ps = pair.map(pi => Number(s[pi]));
+      const ss = Number(s[solo]) - (strokes ? strokes[solo][h] : 0);
+      const ps = pair.map(pi => Number(s[pi]) - (strokes ? strokes[pi][h] : 0));
       let soloTeam = ss * 11;
       let lo = Math.min(...ps), hi = Math.max(...ps);
       if (opts.birdieReverse && ss < par) [lo, hi] = [hi, lo];
@@ -131,8 +151,8 @@ function computeCanonicalTotals(
       if (s.slice(0, 4).some(v => v === "")) continue;
       const par = pars[h];
       const [tA, tB] = getTeams4Static(h, orders, teamMode);
-      const sA = tA.map(pi => Number(s[pi]));
-      const sB = tB.map(pi => Number(s[pi]));
+      const sA = tA.map(pi => Number(s[pi]) - (strokes ? strokes[pi][h] : 0));
+      const sB = tB.map(pi => Number(s[pi]) - (strokes ? strokes[pi][h] : 0));
       let loA = Math.min(...sA), hiA = Math.max(...sA);
       let loB = Math.min(...sB), hiB = Math.max(...sB);
       if (opts.birdieReverse) {
@@ -176,7 +196,7 @@ export default function App() {
   );
   const [pars, setPars] = useState<number[]>(Array(HOLES).fill(4));
   const [opts, setOpts] = useState<Opts>({
-    carry: false, birdieReverse: false, truncate: false, push: false, olympic: false,
+    carry: false, birdieReverse: false, truncate: false, push: false, olympic: false, handicap: false,
   });
   const [localOpts, setLocalOpts] = useState<Opts | null>(null);
   const [localTeamMode, setLocalTeamMode] = useState<string | null>(null);
@@ -185,6 +205,10 @@ export default function App() {
     () => Array(HOLES).fill(null).map(() => Array(4).fill(null))
   );
   const [olympicPts, setOlympicPts] = useState({ gold: 5, silver: 3, bronze: 2, iron: 1 });
+  const [handicaps, setHandicaps] = useState<number[]>([0, 0, 0, 0]);
+  const [strokeIndexes, setStrokeIndexes] = useState<number[]>(
+    () => Array.from({ length: 18 }, (_, i) => i + 1)
+  );
   const [teamMode, setTeamMode] = useState("order_1_23");
   const [frontLabel, setFrontLabel] = useState("");
   const [backLabel, setBackLabel] = useState("");
@@ -262,11 +286,33 @@ export default function App() {
     }
   }
 
-  // コース名が確定したとき、既に選択済みのラベルがあればpar自動入力
+  async function tryAutofillSI(label: string, holeOffset: number) {
+    const { data: course } = await supabase
+      .from("courses").select("id").ilike("name", courseName).maybeSingle();
+    if (!course) return;
+    const { data } = await supabase
+      .from("course_sections").select("stroke_indexes")
+      .eq("course_id", course.id).ilike("label", label);
+    const counts = new Map<string, number>();
+    for (const row of data ?? []) {
+      if (!row.stroke_indexes || !Array.isArray(row.stroke_indexes) || row.stroke_indexes.length === 0) continue;
+      const key = JSON.stringify(row.stroke_indexes);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top && top[1] >= PAR_AUTOFILL_THRESHOLD) {
+      const best: number[] = JSON.parse(top[0]);
+      setStrokeIndexes(prev => prev.map((v, i) =>
+        i >= holeOffset && i < holeOffset + 9 ? best[i - holeOffset] : v
+      ));
+    }
+  }
+
+  // コース名が確定したとき、既に選択済みのラベルがあればpar自動入力（+ SI自動入力）
   useEffect(() => {
     if (!courseNameValid || isReadOnly) return;
-    if (frontLabel) tryAutofillPars(frontLabel, 0);
-    if (backLabel)  tryAutofillPars(backLabel, 9);
+    if (frontLabel) { tryAutofillPars(frontLabel, 0); tryAutofillSI(frontLabel, 0); }
+    if (backLabel)  { tryAutofillPars(backLabel, 9);  tryAutofillSI(backLabel, 9); }
   }, [courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // サイトアクセスログ記録 + 訪問者カウント更新（初回マウント時のみ）
@@ -332,6 +378,8 @@ export default function App() {
           setSelectedGroupId((data as any).group_id ?? null);
           setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
           setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
+          setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
+          setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
             names: data.names, scores: data.scores,
@@ -340,6 +388,8 @@ export default function App() {
             groupId: (data as any).group_id ?? null,
             olympicMedals: (data as any).olympic_medals ?? [],
             pushCounts: (data as any).push_counts ?? [],
+            handicaps: (data as any).handicaps ?? [],
+            strokeIndexes: (data as any).stroke_indexes ?? [],
           }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -370,6 +420,8 @@ export default function App() {
         setSelectedGroupId((data as any).group_id ?? null);
         setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
         setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
+        setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
+        setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
           names: data.names, scores: data.scores,
@@ -378,6 +430,8 @@ export default function App() {
           groupId: (data as any).group_id ?? null,
           olympicMedals: (data as any).olympic_medals ?? [],
           pushCounts: (data as any).push_counts ?? [],
+          handicaps: (data as any).handicaps ?? [],
+          strokeIndexes: (data as any).stroke_indexes ?? [],
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -497,6 +551,8 @@ export default function App() {
     setSelectedGroupId((data as any).group_id ?? null);
     setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
     setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
+    setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
+    setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
       names: data.names, scores: data.scores,
@@ -505,6 +561,8 @@ export default function App() {
       groupId: (data as any).group_id ?? null,
       olympicMedals: (data as any).olympic_medals ?? [],
       pushCounts: (data as any).push_counts ?? [],
+      handicaps: (data as any).handicaps ?? [],
+      strokeIndexes: (data as any).stroke_indexes ?? [],
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -626,10 +684,12 @@ export default function App() {
     setNames(displayName ? [displayName, "Player2", "Player3", "Player4"] : ["Player1", "Player2", "Player3", "Player4"]);
     setScores(Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setPars(Array(HOLES).fill(4));
-    setOpts({ carry: false, birdieReverse: false, truncate: false, push: false, olympic: false });
+    setOpts({ carry: false, birdieReverse: false, truncate: false, push: false, olympic: false, handicap: false });
     setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
     setOlympicPts({ gold: 5, silver: 3, bronze: 2, iron: 1 });
     setPushCounts(Array(HOLES).fill(0));
+    setHandicaps([0, 0, 0, 0]);
+    setStrokeIndexes(Array.from({ length: 18 }, (_, i) => i + 1));
     setTeamMode("order_1_23");
     setFrontLabel("");
     setBackLabel("");
@@ -702,6 +762,11 @@ export default function App() {
     }
   };
 
+  const hcStrokes = useMemo(() =>
+    displayOpts.handicap ? computeHandicapStrokes(handicaps, strokeIndexes, n) : null,
+    [displayOpts.handicap, handicaps, strokeIndexes, n]
+  );
+
   const results3 = useMemo((): (Result3 | null)[] => {
     if (mode !== 3) return [];
     let carry = 1;
@@ -715,8 +780,8 @@ export default function App() {
       else if (displayTeamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
       else if (displayTeamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
       else                                        { solo = order[0]; pair = [order[1], order[2]]; } // order_1_23
-      const ss = Number(s[solo]);
-      const ps = pair.map(pi => Number(s[pi]));
+      const ss = Number(s[solo]) - (hcStrokes ? hcStrokes[solo][h] : 0);
+      const ps = pair.map(pi => Number(s[pi]) - (hcStrokes ? hcStrokes[pi][h] : 0));
       let soloTeam = ss * 11;
       let lo = Math.min(...ps), hi = Math.max(...ps);
       if (displayOpts.birdieReverse && ss < par) [lo, hi] = [hi, lo];
@@ -739,7 +804,7 @@ export default function App() {
       else           { pts[solo] = x * 2; pair.forEach(p => { pts[p] = -x; }); }
       return { solo, pair, soloTeam, pairTeam, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode, hcStrokes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results4 = useMemo((): (Result4 | null)[] => {
     if (mode !== 4) return [];
@@ -749,8 +814,8 @@ export default function App() {
       if (s.slice(0, 4).some(v => v === "")) return null;
       const par = pars[h];
       const [tA, tB] = getTeams4(h);
-      const sA = tA.map(pi => Number(s[pi]));
-      const sB = tB.map(pi => Number(s[pi]));
+      const sA = tA.map(pi => Number(s[pi]) - (hcStrokes ? hcStrokes[pi][h] : 0));
+      const sB = tB.map(pi => Number(s[pi]) - (hcStrokes ? hcStrokes[pi][h] : 0));
       let loA = Math.min(...sA), hiA = Math.max(...sA);
       let loB = Math.min(...sB), hiB = Math.max(...sB);
       if (displayOpts.birdieReverse) {
@@ -780,7 +845,7 @@ export default function App() {
       }
       return { tA, tB, scA, scB, diff, mult, tied: false, pts };
     });
-  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orders, scores, pars, displayOpts, displayTeamMode, pushCounts, mode, hcStrokes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const results: Result[] = mode === 3 ? results3 : results4;
 
@@ -907,8 +972,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts }),
-    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -1017,6 +1082,8 @@ export default function App() {
     setFrontLabel(data.front_label ?? "");
     setBackLabel(data.back_label ?? "");
     setSessionDisplayDate(formatDate(data.updated_at));
+    setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
+    setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
     setSavedSnapshot(snap);
     if (tokenData.role === "join") {
       localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -1055,7 +1122,7 @@ export default function App() {
     if (!canSave || saving) return;
     setSaving(true);
     // canonical opts/teamMode で totals を再計算（参加者の localOpts 汚染を排除）
-    const canonicalTotals = computeCanonicalTotals(scores, pars, opts, teamMode, mode, pushCounts);
+    const canonicalTotals = computeCanonicalTotals(scores, pars, opts, teamMode, mode, pushCounts, handicaps, strokeIndexes);
     // olympic totals（opts.olympic が正規の判定基準）
     const olTotals = opts.olympic ? olympicTotals : Array(n).fill(0);
     await supabase.from("sessions").upsert({
@@ -1077,11 +1144,13 @@ export default function App() {
       group_id: selectedGroupId,
       front_label: frontLabel,
       back_label: backLabel,
+      handicaps,
+      stroke_indexes: strokeIndexes,
     });
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
 
-    // course_sections へ par データを投稿（オーナーのみ・best-effort）
+    // course_sections へ par データ + SI データを投稿（オーナーのみ・best-effort）
     if (courseName.trim() && !isParticipant) {
       try {
         // courses: 同名コースがなければ insert（あれば select）
@@ -1098,8 +1167,10 @@ export default function App() {
           const submissions = [];
           const frontPars = pars.slice(0, 9);
           const backPars  = pars.slice(9, 18);
-          if (frontLabel && !isAllFour(frontPars)) submissions.push({ course_id: course.id, label: frontLabel, pars: frontPars, device_id: deviceId });
-          if (backLabel  && !isAllFour(backPars))  submissions.push({ course_id: course.id, label: backLabel,  pars: backPars,  device_id: deviceId });
+          const frontSI = strokeIndexes.slice(0, 9);
+          const backSI  = strokeIndexes.slice(9, 18);
+          if (frontLabel && !isAllFour(frontPars)) submissions.push({ course_id: course.id, label: frontLabel, pars: frontPars, stroke_indexes: frontSI, device_id: deviceId });
+          if (backLabel  && !isAllFour(backPars))  submissions.push({ course_id: course.id, label: backLabel,  pars: backPars,  stroke_indexes: backSI,  device_id: deviceId });
           for (const s of submissions) {
             await supabase.from("course_sections").upsert(s, { onConflict: "course_id,label,device_id" });
           }
@@ -1379,7 +1450,7 @@ export default function App() {
                   <button key={v} onClick={() => {
                     const next = label === v ? "" : v;
                     setLabel(next);
-                    if (next && courseNameValid && !isReadOnly) tryAutofillPars(next, offset);
+                    if (next && courseNameValid && !isReadOnly) { tryAutofillPars(next, offset); tryAutofillSI(next, offset); }
                   }} style={{
                     padding: "3px 8px", borderRadius: 10, fontSize: 10,
                     border: `1px solid ${label === v ? GOLD : "#2a4a2a"}`,
@@ -1392,7 +1463,7 @@ export default function App() {
                   value={label === "In" || label === "Out" ? "" : label}
                   onChange={e => setLabel(e.target.value)}
                   onFocus={() => { if (label === "In" || label === "Out") setLabel(""); }}
-                  onBlur={e => { if (e.target.value && courseNameValid && !isReadOnly) tryAutofillPars(e.target.value, offset); }}
+                  onBlur={e => { if (e.target.value && courseNameValid && !isReadOnly) { tryAutofillPars(e.target.value, offset); tryAutofillSI(e.target.value, offset); } }}
                   placeholder="自由記載"
                   style={{
                     flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
@@ -1525,6 +1596,24 @@ export default function App() {
                         opacity: isSettingsLocked ? 0.7 : 1,
                       }}
                     />
+                    {displayOpts.handicap && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                        <span style={{ fontSize: 8, color: "#6b8b6b" }}>HC</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={54}
+                          value={handicaps[i]}
+                          onChange={e => setHandicaps(prev => prev.map((v, j) => j === i ? Math.max(0, Math.min(54, Number(e.target.value) || 0)) : v))}
+                          disabled={isSettingsLocked}
+                          style={{
+                            width: 32, padding: "2px 2px", textAlign: "center",
+                            background: "#0a160a", border: "1px solid #2a4a2a",
+                            borderRadius: 4, color: "#f5f0e8", fontSize: 10, outline: "none",
+                          }}
+                        />
+                      </div>
+                    )}
                     {!isParticipant && !isSharedView && !isViewing && (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                         {token ? (
@@ -1621,6 +1710,7 @@ export default function App() {
               { k: "carry" as const, l: "キャリー" },
               { k: "push" as const, l: "プッシュ" },
               { k: "olympic" as const, l: "オリンピック" },
+              { k: "handicap" as const, l: "ハンディキャップ" },
             ]).map(({ k, l }) => (
               <button key={k} onClick={() => {
                 if (isParticipant || isSharedView || isAdminMode) {
@@ -1724,6 +1814,18 @@ export default function App() {
                         <option value={2}>P×2</option>
                       </select>
                     )}
+                    {displayOpts.handicap && (
+                      <select
+                        value={strokeIndexes[h]}
+                        onChange={e => setStrokeIndexes(prev => prev.map((v, ph) => ph === h ? Number(e.target.value) : v))}
+                        disabled={isReadOnly}
+                        style={{ marginTop: 2, fontSize: 7, padding: "1px 2px", borderRadius: 3, background: "#0a160a", border: "1px solid #2a4a6a", color: "#4a9bdb" }}
+                      >
+                        {Array.from({ length: 18 }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>SI{i + 1}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   {Array.from({ length: n }, (_, pi) => {
@@ -1770,7 +1872,7 @@ export default function App() {
                               alignItems: "center", justifyContent: "center",
                               opacity: isReadOnly ? 0.8 : 1,
                             }}
-                          >{sc || "·"}</div>
+                          >{sc ? (hcStrokes && hcStrokes[pi]?.[h] ? `${sc}·` : sc) : "·"}</div>
                           {displayOpts.olympic && (() => {
                             const olPt = calcOlympicHolePts(olympicMedals[h], n)[pi];
                             return (
