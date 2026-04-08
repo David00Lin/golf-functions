@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import type { Opts } from "./types";
+import type { Opts, Group } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
 import { getSessionId, getDeviceId, newSession } from "./lib/session";
@@ -208,6 +208,10 @@ export default function App() {
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
   const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groupList, setGroupList] = useState<Group[]>([]);
+  const [showGroupCreate, setShowGroupCreate] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
@@ -303,11 +307,13 @@ export default function App() {
           setBackLabel(data.back_label ?? "");
           setCourseNameValid(!!data.course_name);
           setSessionDisplayDate(formatDate(data.updated_at));
+          setSelectedGroupId((data as any).group_id ?? null);
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
             names: data.names, scores: data.scores,
             opts: data.opts, mode: data.mode, teamMode: data.team_mode,
             frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
+            groupId: (data as any).group_id ?? null,
           }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -335,11 +341,13 @@ export default function App() {
         setBackLabel(data.back_label ?? "");
         setCourseNameValid(!!data.course_name);
         setSessionDisplayDate(formatDate(data.updated_at));
+        setSelectedGroupId((data as any).group_id ?? null);
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
           names: data.names, scores: data.scores,
           opts: data.opts, mode: data.mode, teamMode: data.team_mode,
           frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
+          groupId: (data as any).group_id ?? null,
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -363,11 +371,13 @@ export default function App() {
           setFrontLabel(d.front_label ?? "");
           setBackLabel(d.back_label ?? "");
           setCourseNameValid(!!d.course_name);
+          setSelectedGroupId(d.group_id ?? null);
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
             names: d.names, scores: d.scores,
             opts: d.opts, mode: d.mode, teamMode: d.team_mode,
             frontLabel: d.front_label ?? "", backLabel: d.back_label ?? "",
+            groupId: d.group_id ?? null,
           }));
         }
       )
@@ -409,6 +419,16 @@ export default function App() {
       .then(({ data }) => { setAccessLogs(data ?? []); });
   }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // オーナー用：グループ一覧取得（初回マウント時のみ）
+  useEffect(() => {
+    if (isSharedView || isParticipant) return;
+    supabase.from("groups")
+      .select("id, name, member_names, mode")
+      .eq("owner_device_id", getDeviceId())
+      .order("updated_at", { ascending: false })
+      .then(({ data }) => { setGroupList((data ?? []) as Group[]); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
     if (isDirty && !window.confirm("現在の入力内容は保存されません。過去の記録を表示しますか？")) return;
@@ -426,11 +446,13 @@ export default function App() {
     setBackLabel(data.back_label ?? "");
     setCourseNameValid(!!data.course_name);
     setSessionDisplayDate(formatDate(data.updated_at));
+    setSelectedGroupId((data as any).group_id ?? null);
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
       names: data.names, scores: data.scores,
       opts: data.opts, mode: data.mode, teamMode: data.team_mode,
       frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
+      groupId: (data as any).group_id ?? null,
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -447,6 +469,40 @@ export default function App() {
     setMode(m);
     setTeamMode(m === 3 ? "order_1_23" : "order_14_23");
     setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+    // 人数が異なるグループは解除
+    if (selectedGroupId) {
+      const g = groupList.find(g => g.id === selectedGroupId);
+      if (g && g.mode !== m) setSelectedGroupId(null);
+    }
+  }
+
+  // グループを選択してメンバー名を自動補完
+  function applyGroup(g: Group) {
+    if (g.mode !== mode && opts.olympic && olympicMedals.some(row => row.some(v => v !== null))) {
+      if (!window.confirm("グループを適用すると人数が変わり、オリンピックのメダル入力がリセットされます。よろしいですか？")) return;
+    }
+    setSelectedGroupId(g.id);
+    setNames(prev => prev.map((name, i) => i < g.member_names.length ? g.member_names[i] : name));
+    if (g.mode !== mode) {
+      setMode(g.mode);
+      setTeamMode(g.mode === 3 ? "order_1_23" : "order_14_23");
+      setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+    }
+  }
+
+  // 現在のメンバーをグループとして保存
+  async function createGroupFromCurrentNames(groupName: string) {
+    const { data, error } = await supabase.from("groups").insert({
+      owner_device_id: getDeviceId(),
+      name: groupName,
+      member_names: names.slice(0, n),
+      mode: n,
+    }).select("id, name, member_names, mode").single();
+    if (error) { alert(`グループ保存に失敗しました: ${error.message}`); return; }
+    setGroupList(prev => [data as Group, ...prev]);
+    setSelectedGroupId(data.id);
+    setShowGroupCreate(false);
+    setNewGroupName("");
   }
 
   // 履歴削除
@@ -505,6 +561,9 @@ export default function App() {
     setPlayerTokenExpiresAt([null, null, null, null]);
     setViewCode(null);
     setShareInput("");
+    setSelectedGroupId(null);
+    setShowGroupCreate(false);
+    setNewGroupName("");
   }
 
   const n = mode;
@@ -762,8 +821,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel }),
-    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -927,6 +986,7 @@ export default function App() {
       opts,
       totals: canonicalTotals,
       olympic_totals: olTotals,
+      group_id: selectedGroupId,
       front_label: frontLabel,
       back_label: backLabel,
     });
@@ -1261,6 +1321,82 @@ export default function App() {
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>PLAYERS</div>
           <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>1H の打順に入力してください</div>
+
+          {/* グループ管理UI（オーナーのみ） */}
+          {!isParticipant && !isSharedView && !isViewing && (
+            <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #1a3a1a" }}>
+              {/* グループ選択（グループが存在する場合のみ表示） */}
+              {groupList.length > 0 && !showGroupCreate && (
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 8, color: "#6b8b6b", flexShrink: 0 }}>グループ</span>
+                  {selectedGroupId ? (
+                    <>
+                      <span style={{ fontSize: 10, color: GOLD, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        ✓ {groupList.find(g => g.id === selectedGroupId)?.name ?? ""}
+                      </span>
+                      <button onClick={() => setSelectedGroupId(null)} style={{
+                        padding: "2px 8px", fontSize: 8, borderRadius: 10, flexShrink: 0,
+                        border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer",
+                      }}>解除</button>
+                    </>
+                  ) : (
+                    <select
+                      value=""
+                      onChange={e => { const g = groupList.find(g => g.id === e.target.value); if (g) applyGroup(g); }}
+                      style={{
+                        flex: 1, padding: "3px 4px", fontSize: 10,
+                        background: "#1a2e1a", border: "1px solid #2a4a2a",
+                        borderRadius: 6, color: "#f5f0e8", outline: "none",
+                      }}
+                    >
+                      <option value="">-- グループを選択 --</option>
+                      {groupList.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}（{g.mode}人）</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+              {/* グループ作成フォーム */}
+              {showGroupCreate ? (
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
+                    placeholder="グループ名（例：毎週水曜組）"
+                    style={{
+                      flex: 1, padding: "4px 6px", fontSize: 10, minWidth: 0,
+                      background: "#1a2e1a", border: "1px solid #2a4a6a",
+                      borderRadius: 6, color: "#f5f0e8", outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={() => { if (newGroupName.trim()) createGroupFromCurrentNames(newGroupName.trim()); }}
+                    disabled={!newGroupName.trim()}
+                    style={{
+                      padding: "4px 10px", fontSize: 8, borderRadius: 4, flexShrink: 0,
+                      border: `1px solid ${newGroupName.trim() ? GOLD : "#2a4a2a"}`,
+                      background: "transparent", color: newGroupName.trim() ? GOLD : "#3a5a3a",
+                      cursor: newGroupName.trim() ? "pointer" : "default",
+                    }}
+                  >保存</button>
+                  <button onClick={() => { setShowGroupCreate(false); setNewGroupName(""); }} style={{
+                    padding: "4px 8px", fontSize: 8, borderRadius: 4, flexShrink: 0,
+                    border: "1px solid #2a3a2a", background: "transparent", color: "#4a6a4a", cursor: "pointer",
+                  }}>✕</button>
+                </div>
+              ) : (
+                /* 全員入力済み かつ 未グループ選択 の場合のみ保存ボタン表示 */
+                !selectedGroupId && names.slice(0, n).every(name => name.trim() && !/^Player\d+$/.test(name.trim())) && (
+                  <button onClick={() => setShowGroupCreate(true)} style={{
+                    width: "100%", padding: "4px 0", fontSize: 8, borderRadius: 4,
+                    border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer",
+                  }}>このメンバーをグループとして保存</button>
+                )
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 6 }}>
             {(() => {
               const issuedCount = playerTokens.slice(0, n).filter(t => t !== null).length;
