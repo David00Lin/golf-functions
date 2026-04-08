@@ -493,8 +493,12 @@ export default function App() {
     }
   }
 
-  // 現在のメンバーをグループとして保存
+  // 現在のメンバーをグループとして保存（上限5件）
   async function createGroupFromCurrentNames(groupName: string) {
+    if (groupList.length >= 5) {
+      alert("グループは最大5つまで作成できます。不要なグループを削除してください。");
+      return;
+    }
     const { data, error } = await supabase.from("groups").insert({
       owner_device_id: getDeviceId(),
       name: groupName,
@@ -1389,8 +1393,8 @@ export default function App() {
                   }}>✕</button>
                 </div>
               ) : (
-                /* 全員入力済み かつ 未グループ選択 の場合のみ保存ボタン表示 */
-                !selectedGroupId && names.slice(0, n).every(name => name.trim() && !/^Player\d+$/.test(name.trim())) && (
+                /* 全員入力済み かつ 未グループ選択 かつ 上限未満 の場合のみ保存ボタン表示 */
+                !selectedGroupId && groupList.length < 5 && names.slice(0, n).every(name => name.trim() && !/^Player\d+$/.test(name.trim())) && (
                   <button onClick={() => setShowGroupCreate(true)} style={{
                     width: "100%", padding: "4px 0", fontSize: 8, borderRadius: 4,
                     border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer",
