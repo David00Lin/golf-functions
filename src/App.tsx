@@ -3,6 +3,7 @@ import type { Opts, Group, LeaderboardEntry } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
 import { getSessionId, getDeviceId, newSession } from "./lib/session";
+import { i18n, type Lang, type I18nKey } from "./i18n";
 
 const HOLES = 18;
 const PAR_AUTOFILL_THRESHOLD = 2;
@@ -242,6 +243,8 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [leaderboardGroupName, setLeaderboardGroupName] = useState("");
+  const [lang, setLang] = useState<Lang>("ja");
+  const t = (key: I18nKey) => i18n[lang][key];
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
 
@@ -361,7 +364,7 @@ export default function App() {
         .then(async ({ data: tokenData }) => {
           if (!tokenData) return;
           if (tokenData.role === "join" && tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
-            alert("このコードは有効期限が切れています。再発行してもらってください。");
+            alert(t('expiredCode'));
             return;
           }
           const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
@@ -535,7 +538,7 @@ export default function App() {
 
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
-    if (isDirty && !window.confirm("現在の入力内容は保存されません。過去の記録を表示しますか？")) return;
+    if (isDirty && !window.confirm(t('confirmLoadHistory'))) return;
     const { data } = await supabase.from("sessions").select("*").eq("id", id).single();
     if (!data) return;
     // localStorage / sessionId は変更しない（現セッションIDを守る）
@@ -576,7 +579,7 @@ export default function App() {
   // モード切り替え（teamMode をそのモードのデフォルトにリセット）
   function handleModeChange(m: 3 | 4) {
     if (opts.olympic && olympicMedals.some(row => row.some(v => v !== null))) {
-      if (!window.confirm("人数を変えるとオリンピックのメダル入力がリセットされます。よろしいですか？")) return;
+      if (!window.confirm(t('confirmModeChange'))) return;
     }
     setMode(m);
     setTeamMode(m === 3 ? "order_1_23" : "order_14_23");
@@ -591,7 +594,7 @@ export default function App() {
   // グループを選択してメンバー名を自動補完
   function applyGroup(g: Group) {
     if (g.mode !== mode && opts.olympic && olympicMedals.some(row => row.some(v => v !== null))) {
-      if (!window.confirm("グループを適用すると人数が変わり、オリンピックのメダル入力がリセットされます。よろしいですか？")) return;
+      if (!window.confirm(t('confirmGroupApply'))) return;
     }
     setSelectedGroupId(g.id);
     setNames(prev => prev.map((name, i) => i < g.member_names.length ? g.member_names[i] : name));
@@ -605,7 +608,7 @@ export default function App() {
   // 現在のメンバーをグループとして保存（上限5件）
   async function createGroupFromCurrentNames(groupName: string) {
     if (groupList.length >= 5) {
-      alert("グループは最大5つまで作成できます。不要なグループを削除してください。");
+      alert(t('maxGroups'));
       return;
     }
     const { data, error } = await supabase.from("groups").insert({
@@ -614,7 +617,7 @@ export default function App() {
       member_names: names.slice(0, n),
       mode: n,
     }).select("id, name, member_names, mode").single();
-    if (error) { alert(`グループ保存に失敗しました: ${error.message}`); return; }
+    if (error) { alert(t('groupSaveFailed') + error.message); return; }
     setGroupList(prev => [data as Group, ...prev]);
     setSelectedGroupId(data.id);
     setShowGroupCreate(false);
@@ -623,9 +626,9 @@ export default function App() {
 
   // グループ削除
   async function deleteGroup(groupId: string) {
-    if (!window.confirm("このグループを削除しますか？")) return;
+    if (!window.confirm(t('confirmDelete'))) return;
     const { error } = await supabase.from("groups").delete().eq("id", groupId);
-    if (error) { alert(`削除に失敗しました: ${error.message}`); return; }
+    if (error) { alert(t('deleteFailed') + error.message); return; }
     setGroupList(prev => prev.filter(g => g.id !== groupId));
     if (selectedGroupId === groupId) setSelectedGroupId(null);
   }
@@ -638,9 +641,9 @@ export default function App() {
     });
     if (error) {
       if (error.code === "23505") {
-        alert(`「${name}」はすでに他の端末で使用されています。別の名前を入力してください。`);
+        alert(`「${name}」` + t('nameTaken'));
       } else {
-        alert(`名前の登録に失敗しました: ${error.message}`);
+        alert(t('nameRegFailed') + error.message);
       }
       return;
     }
@@ -661,7 +664,7 @@ export default function App() {
   // 履歴削除
   async function deleteSessionById(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm("この記録を削除しますか？")) return;
+    if (!window.confirm(t('confirmDeleteRecord'))) return;
     await supabase.from("sessions").delete().eq("id", id);
     if (viewingSessionId === id) startNewSession();
     fetchHistory();
@@ -681,7 +684,7 @@ export default function App() {
   // 新しいゲーム
   function handleNewSession() {
     if (!hasAnyInput) return;
-    if (isDirty && !window.confirm("新しいゲームを開始しますか？\n現在の入力内容は保存されません。")) return;
+    if (isDirty && !window.confirm(t('confirmNew'))) return;
     startNewSession();
   }
 
@@ -998,11 +1001,11 @@ export default function App() {
     if (!viewingSessionId) return;
     const { data: existing } = await supabase
       .from("share_tokens").select("token").eq("session_id", viewingSessionId).eq("role", "view").maybeSingle();
-    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
+    if (existing && !window.confirm(t('confirmReissue'))) return;
     await supabase.from("share_tokens").delete().eq("session_id", viewingSessionId).eq("role", "view");
     const token = generateShareToken();
     const { error } = await supabase.from("share_tokens").insert({ token, session_id: viewingSessionId, role: "view" });
-    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
+    if (error) { alert(t('codeIssueFailed') + error.message); return; }
     setViewCode(token);
   }
 
@@ -1010,11 +1013,11 @@ export default function App() {
     if (!canSave || isDirty) return;
     const { data: existing } = await supabase
       .from("share_tokens").select("token").eq("session_id", sessionId).eq("role", role).maybeSingle();
-    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
+    if (existing && !window.confirm(t('confirmReissue'))) return;
     await supabase.from("share_tokens").delete().eq("session_id", sessionId).eq("role", role);
     const token = generateShareToken();
     const { error } = await supabase.from("share_tokens").insert({ token, session_id: sessionId, role });
-    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
+    if (error) { alert(t('codeIssueFailed') + error.message); return; }
     setViewCode(token);
   }
 
@@ -1024,7 +1027,7 @@ export default function App() {
       .from("share_tokens").select("token")
       .eq("session_id", sessionId).eq("role", "join").eq("player_index", playerIndex)
       .maybeSingle();
-    if (existing && !window.confirm("前回のコードは使用不可になります。再発行しますか？")) return;
+    if (existing && !window.confirm(t('confirmReissue'))) return;
     await supabase.from("share_tokens").delete()
       .eq("session_id", sessionId).eq("role", "join").eq("player_index", playerIndex);
     const token = generateShareToken();
@@ -1032,7 +1035,7 @@ export default function App() {
     const { error } = await supabase.from("share_tokens").insert({
       token, session_id: sessionId, role: "join", player_index: playerIndex, expires_at: expiresAt,
     });
-    if (error) { alert(`コード発行に失敗しました: ${error.message}`); return; }
+    if (error) { alert(t('codeIssueFailed') + error.message); return; }
     setPlayerTokens(prev => prev.map((t, i) => i === playerIndex ? token : t));
     setPlayerTokenExpiresAt(prev => prev.map((t, i) => i === playerIndex ? expiresAt : t));
   }
@@ -1066,11 +1069,11 @@ export default function App() {
     const { data: tokenData, error: tokenError } = await supabase
       .from("share_tokens").select("session_id, role, expires_at").eq("token", token).single();
     if (tokenError || !tokenData) {
-      alert(tokenError ? `エラー: ${tokenError.message}` : "コードが見つかりません");
+      alert(tokenError ? t('error') + tokenError.message : t('codeNotFound'));
       return;
     }
     if (tokenData.role === "join" && tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
-      alert("このコードは有効期限が切れています。再発行してもらってください。");
+      alert(t('expiredCode'));
       return;
     }
     const { data } = await supabase.from("sessions").select("*").eq("id", tokenData.session_id).single();
@@ -1209,6 +1212,13 @@ export default function App() {
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
+        <button onClick={() => setLang(l => l === "ja" ? "zh" : "ja")} style={{
+          position: "absolute", top: 14, right: 44,
+          background: lang === "zh" ? "#2a1f00" : "transparent",
+          border: `1px solid ${lang === "zh" ? GOLD : "#2a4a2a"}`,
+          borderRadius: 6, color: lang === "zh" ? GOLD : "#6b8b6b",
+          fontSize: 11, cursor: "pointer", padding: "2px 6px",
+        }}>{lang === "zh" ? "日本語" : "繁"}</button>
         {/* ハンバーガーメニュー */}
         <button style={{
           position: "absolute", top: 14, right: 12,
@@ -1229,7 +1239,7 @@ export default function App() {
               background: "transparent",
               color: hasAnyInput ? "#6b8b6b" : "#2a3a2a",
               fontSize: 10, cursor: hasAnyInput ? "pointer" : "default",
-            }}>新ゲーム</button>
+            }}>{t('newGame')}</button>
           {isParticipant ? (
             <div style={{
               padding: "3px 14px", borderRadius: 6,
@@ -1258,7 +1268,7 @@ export default function App() {
             background: showHistory ? "#2a1f00" : "transparent",
             color: showHistory ? GOLD : "#6b8b6b",
             fontSize: 10, cursor: "pointer",
-          }}>履歴</button>
+          }}>{t('history')}</button>
         </div>
       </div>
 
@@ -1275,10 +1285,10 @@ export default function App() {
             fontSize: 11, color: isParticipant ? "#4a9bdb" : GOLD, letterSpacing: 1,
           }}>
             {isSharedView
-              ? "共有された記録を閲覧中（編集不可）"
+              ? t('sharedView')
               : isParticipant
-              ? "参加中 — スコア入力のみ可（ゴルフ場・プレイヤー名・設定はオーナーが管理）"
-              : "過去の記録を閲覧中"}
+              ? t('participantView')
+              : t('viewingPast')}
           </span>
           {isViewing && !isSharedView && (
             <>
@@ -1289,7 +1299,7 @@ export default function App() {
                 fontSize: 11, cursor: "pointer", letterSpacing: 0.5,
                 whiteSpace: "nowrap",
               }}>
-                閲覧コードを発行
+                {t('viewCode')}
               </button>
               <button onClick={handleContinueSession} style={{
                 padding: "5px 20px", borderRadius: 20,
@@ -1298,13 +1308,13 @@ export default function App() {
                 fontSize: 12, cursor: "pointer", fontWeight: "bold", letterSpacing: 0.5,
                 whiteSpace: "nowrap",
               }}>
-                このゲームを続ける
+                {t('continueGame')}
               </button>
             </>
           )}
           {isViewing && !isSharedView && viewCode && (
             <div style={{ width: "100%", textAlign: "center", marginTop: 4 }}>
-              <span style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 1 }}>閲覧コード: </span>
+              <span style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 1 }}>{t('viewCodeBtn')}</span>
               <span style={{ fontSize: 18, fontWeight: "bold", letterSpacing: 6, color: "#f5f0e8" }}>{viewCode}</span>
             </div>
           )}
@@ -1313,13 +1323,13 @@ export default function App() {
             const last = accessLogs[0];
             return (
               <div style={{ width: "100%", marginTop: 6, padding: "6px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
-                <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 3 }}>アクセス状況（オーナーのみ表示）</div>
+                <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 3 }}>{t('accessStats')}</div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>総アクセス: <b style={{ color: GOLD }}>{accessLogs.length}</b> 回</span>
-                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>ユニーク: <b style={{ color: GOLD }}>{uniqueDevices}</b> 人</span>
+                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>{t('totalAccess')}<b style={{ color: GOLD }}>{accessLogs.length}</b>{t('times')}</span>
+                  <span style={{ fontSize: 11, color: "#c8d8c8" }}>{t('uniqueUsers')}<b style={{ color: GOLD }}>{uniqueDevices}</b>{t('people')}</span>
                 </div>
                 <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 3 }}>
-                  最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
+                  {t('lastAccess')}{new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                 </div>
               </div>
             );
@@ -1338,7 +1348,7 @@ export default function App() {
             <input
               value={shareInput}
               onChange={e => setShareInput(e.target.value.toUpperCase())}
-              placeholder="共有コード（6桁）"
+              placeholder={t('shareCode')}
               maxLength={6}
               style={{
                 flex: 1, padding: "6px 8px", borderRadius: 6,
@@ -1357,7 +1367,7 @@ export default function App() {
                 color: shareInput.trim().length === 6 ? GOLD : "#3a5a3a",
                 fontSize: 12, cursor: shareInput.trim().length === 6 ? "pointer" : "default",
               }}
-            >開く</button>
+            >{t('open')}</button>
           </div>
           {isAdminMode && (
             <div style={{ padding: "6px 16px", background: "#1a0a00", borderBottom: "1px solid #4a2a00" }}>
@@ -1367,7 +1377,7 @@ export default function App() {
             </div>
           )}
           {(isAdminMode ? adminSessionList : historyList).length === 0 ? (
-            <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>記録なし</div>
+            <div style={{ padding: 16, textAlign: "center", fontSize: 11, color: "#4a6a4a" }}>{t('noRecords')}</div>
           ) : (isAdminMode ? adminSessionList : historyList).map(s => (
             <div key={s.id} onClick={() => loadSessionById(s.id)} style={{
               padding: "10px 16px", borderBottom: "1px solid #1a2a1a",
@@ -1376,7 +1386,7 @@ export default function App() {
             }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 12, color: "#c8d8c8", marginBottom: 2 }}>
-                  {s.course_name || "（コース名なし）"}
+                  {s.course_name || t('noCourse')}
                 </div>
                 <div style={{ fontSize: 9, color: "#4a6a4a" }}>
                   {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
@@ -1411,7 +1421,7 @@ export default function App() {
               onChange={e => { setCourseName(e.target.value); setCourseNameValid(false); }}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               onFocus={() => { if (courseSuggestions.length > 0) setShowSuggestions(true); }}
-              placeholder="ゴルフ場名を検索"
+              placeholder={t('searchCourse')}
               disabled={isSettingsLocked}
               style={{
                 width: "100%", boxSizing: "border-box",
@@ -1445,15 +1455,15 @@ export default function App() {
             )}
           </div>
           {courseName && !courseNameValid && !isReadOnly && (
-            <div style={{ fontSize: 9, color: RED, marginBottom: 4 }}>登録されていないゴルフ場です</div>
+            <div style={{ fontSize: 9, color: RED, marginBottom: 4 }}>{t('courseNotFound')}</div>
           )}
           <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 10, color: "#6b8b6b" }}>{sessionDisplayDate}</span>
           </div>
           {/* 前半/後半ラベル */}
           <div style={{ marginTop: 8, borderTop: "1px solid #1a3a1a", paddingTop: 8, pointerEvents: isSettingsLocked ? "none" : "auto", opacity: isSettingsLocked ? 0.6 : 1 }}>
-            {([["前半", frontLabel, setFrontLabel, 0], ["後半", backLabel, setBackLabel, 9]] as const).map(([half, label, setLabel, offset], idx) => (
-              <div key={half} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
+            {([{half: t('frontHalf'), label: frontLabel, setLabel: setFrontLabel, offset: 0}, {half: t('backHalf'), label: backLabel, setLabel: setBackLabel, offset: 9}]).map(({half, label, setLabel, offset}, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: idx === 0 ? 5 : 0 }}>
                 <span style={{ fontSize: 9, color: "#6a8a6a", minWidth: 26 }}>{half}</span>
                 {(["In", "Out"] as const).map(v => (
                   <button key={v} onClick={() => {
@@ -1473,7 +1483,7 @@ export default function App() {
                   onChange={e => setLabel(e.target.value)}
                   onFocus={() => { if (label === "In" || label === "Out") setLabel(""); }}
                   onBlur={e => { if (e.target.value && courseNameValid && !isReadOnly) { tryAutofillPars(e.target.value, offset); tryAutofillSI(e.target.value, offset); } }}
-                  placeholder="自由記載"
+                  placeholder={t('freeLabel')}
                   style={{
                     flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 6,
                     background: "#0a160a", border: "1px solid #2a4a2a",
@@ -1487,8 +1497,8 @@ export default function App() {
 
         {/* Player names */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>PLAYERS</div>
-          <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>1H の打順に入力してください</div>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 4 }}>{t('players')}</div>
+          <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 6, letterSpacing: 0.5 }}>{t('orderDesc')}</div>
 
           {/* グループ管理UI（オーナーのみ） */}
           {!isParticipant && !isSharedView && !isViewing && (
@@ -1496,7 +1506,7 @@ export default function App() {
               {/* グループ選択（グループが存在する場合のみ表示） */}
               {groupList.length > 0 && !showGroupCreate && (
                 <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 8, color: "#6b8b6b", flexShrink: 0 }}>グループ</span>
+                  <span style={{ fontSize: 8, color: "#6b8b6b", flexShrink: 0 }}>{t('group')}</span>
                   {selectedGroupId ? (
                     <>
                       <span style={{ fontSize: 10, color: GOLD, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1511,11 +1521,11 @@ export default function App() {
                           padding: "2px 8px", fontSize: 8, borderRadius: 10, flexShrink: 0,
                           border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, cursor: "pointer",
                         }}
-                      >順位</button>
+                      >{t('ranking')}</button>
                       <button onClick={() => setSelectedGroupId(null)} style={{
                         padding: "2px 8px", fontSize: 8, borderRadius: 10, flexShrink: 0,
                         border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer",
-                      }}>解除</button>
+                      }}>{t('release')}</button>
                     </>
                   ) : (
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
@@ -1549,7 +1559,7 @@ export default function App() {
                   <input
                     value={newGroupName}
                     onChange={e => setNewGroupName(e.target.value)}
-                    placeholder="グループ名（例：毎週水曜組）"
+                    placeholder={t('groupName')}
                     style={{
                       flex: 1, padding: "4px 6px", fontSize: 10, minWidth: 0,
                       background: "#1a2e1a", border: "1px solid #2a4a6a",
@@ -1565,7 +1575,7 @@ export default function App() {
                       background: "transparent", color: newGroupName.trim() ? GOLD : "#3a5a3a",
                       cursor: newGroupName.trim() ? "pointer" : "default",
                     }}
-                  >保存</button>
+                  >{t('save')}</button>
                   <button onClick={() => { setShowGroupCreate(false); setNewGroupName(""); }} style={{
                     padding: "4px 8px", fontSize: 8, borderRadius: 4, flexShrink: 0,
                     border: "1px solid #2a3a2a", background: "transparent", color: "#4a6a4a", cursor: "pointer",
@@ -1577,7 +1587,7 @@ export default function App() {
                   <button onClick={() => setShowGroupCreate(true)} style={{
                     width: "100%", padding: "4px 0", fontSize: 8, borderRadius: 4,
                     border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer",
-                  }}>このメンバーをグループとして保存</button>
+                  }}>{t('saveGroupBtn')}</button>
                 )
               )}
             </div>
@@ -1630,35 +1640,35 @@ export default function App() {
                             <div style={{ fontSize: 11, fontWeight: "bold", letterSpacing: 2, color: "#f5f0e8", textAlign: "center" }}>{token}</div>
                             {expiresAt && (
                               <div style={{ fontSize: 7, color: "#c0a030", textAlign: "center" }}>
-                                {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}まで
+                                {new Date(expiresAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", ...JST })}{t('expiresAt')}
                               </div>
                             )}
                             <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
                               <button
                                 onClick={() => navigator.clipboard.writeText(token)}
                                 style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a6a4a", background: "transparent", color: "#4a9b6b", cursor: "pointer" }}
-                              >コピー</button>
+                              >{t('copy')}</button>
                               <button
                                 onClick={() => issuePlayerCode(i)}
                                 style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #2a4a6a", background: "transparent", color: "#4a7a9b", cursor: "pointer" }}
-                              >再発行</button>
+                              >{t('reissue')}</button>
                               <button
                                 onClick={() => deletePlayerCode(i)}
                                 style={{ padding: "2px 4px", fontSize: 8, borderRadius: 4, border: "1px solid #4a2a2a", background: "transparent", color: "#9b4a4a", cursor: "pointer" }}
-                              >削除</button>
+                              >{t('delete')}</button>
                             </div>
                           </>
                         ) : canIssueCode ? (
                           <button
                             onClick={() => issuePlayerCode(i)}
-                            title={isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力" : ""}
+                            title={isDirty ? t('saveThenIssue') : !canSave ? t('enterNamesFirst') : ""}
                             style={{
                               width: "100%", padding: "3px 0", fontSize: 8, borderRadius: 4,
                               border: "1px solid #2a6a4a",
                               background: "transparent", color: "#4a9b6b",
                               cursor: "pointer",
                             }}
-                          >編集コード発行</button>
+                          >{t('editCode')}</button>
                         ) : null}
                       </div>
                     )}
@@ -1671,20 +1681,20 @@ export default function App() {
 
         {/* 4人チーム分け */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>チーム分け</div>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>{t('teamDiv')}</div>
           {(isParticipant || isSharedView || isAdminMode) && (
-            <div style={{ fontSize: 8, color: "#4a7a4a", marginBottom: 4, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
+            <div style={{ fontSize: 8, color: "#4a7a4a", marginBottom: 4, letterSpacing: 0.5 }}>{t('localOnlyNote')}</div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: mode === 3 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 5, alignItems: "stretch", pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
-            {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id, label }) => {
+            {(mode === 3 ? TEAM_MODES_3 : TEAM_MODES_4).map(({ id }) => {
               const active = displayTeamMode === id;
-              let display = label;
-              if (id === "fixed_1_23")  display = `固定\n${names[0]}\nvs\n${names[1]}&${names[2]}`;
-              if (id === "fixed_2_13")  display = `固定\n${names[1]}\nvs\n${names[0]}&${names[2]}`;
-              if (id === "fixed_3_12")  display = `固定\n${names[2]}\nvs\n${names[0]}&${names[1]}`;
-              if (id === "fixed_12_34") display = `固定\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
-              if (id === "fixed_13_24") display = `固定\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
-              if (id === "fixed_14_23") display = `固定\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
+              let display = t(('tm_' + id) as I18nKey);
+              if (id === "fixed_1_23")  display = `${t('tmFixed')}\n${names[0]}\nvs\n${names[1]}&${names[2]}`;
+              if (id === "fixed_2_13")  display = `${t('tmFixed')}\n${names[1]}\nvs\n${names[0]}&${names[2]}`;
+              if (id === "fixed_3_12")  display = `${t('tmFixed')}\n${names[2]}\nvs\n${names[0]}&${names[1]}`;
+              if (id === "fixed_12_34") display = `${t('tmFixed')}\n${names[0]}&${names[1]}\nvs\n${names[2]}&${names[3]}`;
+              if (id === "fixed_13_24") display = `${t('tmFixed')}\n${names[0]}&${names[2]}\nvs\n${names[1]}&${names[3]}`;
+              if (id === "fixed_14_23") display = `${t('tmFixed')}\n${names[0]}&${names[3]}\nvs\n${names[1]}&${names[2]}`;
               return (
                 <button key={id} onClick={() => {
                   if (isParticipant || isSharedView || isAdminMode) setLocalTeamMode(id);
@@ -1708,18 +1718,18 @@ export default function App() {
 
         {/* Options */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>OPTIONS</div>
+          <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>{t('options')}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
             {(isParticipant || isSharedView || isAdminMode) && (
-              <div style={{ width: "100%", fontSize: 8, color: "#4a7a4a", marginBottom: 2, letterSpacing: 0.5 }}>※ この端末のみの表示設定（保存されません）</div>
+              <div style={{ width: "100%", fontSize: 8, color: "#4a7a4a", marginBottom: 2, letterSpacing: 0.5 }}>{t('localOnlyNote')}</div>
             )}
             {([
-              { k: "birdieReverse" as const, l: "バーディー逆転" },
-              { k: "truncate" as const, l: "1の位切捨て" },
-              { k: "carry" as const, l: "キャリー" },
-              { k: "push" as const, l: "プッシュ" },
-              { k: "olympic" as const, l: "オリンピック" },
-              { k: "handicap" as const, l: "ハンディキャップ" },
+              { k: "birdieReverse" as const, l: t('birdieReverse') },
+              { k: "truncate" as const, l: t('truncate') },
+              { k: "carry" as const, l: t('carry') },
+              { k: "push" as const, l: t('push') },
+              { k: "olympic" as const, l: t('olympic') },
+              { k: "handicap" as const, l: t('handicap') },
             ]).map(({ k, l }) => (
               <button key={k} onClick={() => {
                 if (isParticipant || isSharedView || isAdminMode) {
@@ -1739,14 +1749,14 @@ export default function App() {
             {displayOpts.olympic && (
               <div style={{ width: "100%", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingTop: 6, borderTop: "1px solid #1a3a1a" }}>
                 <span style={{ fontSize: 8, color: "#6b8b6b" }}>
-                  点数設定{(isParticipant || isSharedView || isAdminMode) ? "（この端末のみ）" : ""}:
+                  {t('ptsSetting')}{(isParticipant || isSharedView || isAdminMode) ? t('localOnly') : ""}:
                 </span>
                 {([
-                  { key: "gold" as const, l: "金", color: "#f5c842" },
-                  { key: "silver" as const, l: "銀", color: "#b0b8c0" },
-                  { key: "bronze" as const, l: "銅", color: "#cd7f32" },
-                  { key: "iron" as const, l: "鉄", color: "#7a8a9a" },
-                ]).filter(({ l }) => !(n === 3 && l === "鉄")).map(({ key, l, color }) => (
+                  { key: "gold" as const, l: t('gold'), color: "#f5c842" },
+                  { key: "silver" as const, l: t('silver'), color: "#b0b8c0" },
+                  { key: "bronze" as const, l: t('bronze'), color: "#cd7f32" },
+                  { key: "iron" as const, l: t('iron'), color: "#7a8a9a" },
+                ]).filter(({ key }) => !(n === 3 && key === "iron")).map(({ key, l, color }) => (
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <span style={{ fontSize: 9, color }}>{l}</span>
                     <input
@@ -1930,7 +1940,7 @@ export default function App() {
                             );
                           })()}
                         </div>
-                        {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>単独</div>}
+                        {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>{t('solo')}</div>}
                       </div>
                     );
                   })}
@@ -1955,7 +1965,7 @@ export default function App() {
                 )}
                 {r && r.tied && (
                   <div style={{ padding: "2px 8px", background: "#080f08", fontSize: 8, color: GOLD, textAlign: "center" }}>
-                    引き分け → 次×{r.mult + 1}
+                    {t('tieNext')}{r.mult + 1}
                   </div>
                 )}
               </div>
@@ -1969,8 +1979,8 @@ export default function App() {
                     borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
                   }}>
                     <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                      <span style={{ fontSize: 7 }}>{backLabel || "後半"}</span>
-                      <span>計</span>
+                      <span style={{ fontSize: 7 }}>{backLabel || t('backHalf')}</span>
+                      <span>{t('subtotal')}</span>
                     </div>
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = backTotals[pi];
@@ -1993,7 +2003,7 @@ export default function App() {
                       display: "grid", gridTemplateColumns: gridCols,
                       background: "#090f09", borderBottom: `2px solid ${GOLD}`,
                     }}>
-                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL計</div>
+                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>{t('olTotal')}</div>
                       {Array.from({ length: n }, (_, pi) => {
                         const pt = olympicBack[pi];
                         return (
@@ -2020,8 +2030,8 @@ export default function App() {
                     borderBottom: displayOpts.olympic ? "1px solid #2a3a1a" : `2px solid ${GOLD}`,
                   }}>
                     <div style={{ padding: "5px 2px", textAlign: "center", fontSize: 8, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
-                      <span style={{ fontSize: 7 }}>{frontLabel || "前半"}</span>
-                      <span>計</span>
+                      <span style={{ fontSize: 7 }}>{frontLabel || t('frontHalf')}</span>
+                      <span>{t('subtotal')}</span>
                     </div>
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = halfTotals[pi];
@@ -2044,7 +2054,7 @@ export default function App() {
                       display: "grid", gridTemplateColumns: gridCols,
                       background: "#090f09", borderBottom: `2px solid ${GOLD}`,
                     }}>
-                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>OL計</div>
+                      <div style={{ padding: "3px 2px", textAlign: "center", fontSize: 7, color: "#5a4a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>{t('olTotal')}</div>
                       {Array.from({ length: n }, (_, pi) => {
                         const pt = olympicHalf[pi];
                         return (
@@ -2117,7 +2127,7 @@ export default function App() {
                 paddingTop: 10,
                 fontSize: 9, letterSpacing: 3, color: "#6b8b6b", textAlign: "center",
               }}>
-                精 算
+                {t('settlement')}
               </div>
               {settlement.map((tx, i) => (
                 <div key={i} style={{
@@ -2147,8 +2157,8 @@ export default function App() {
 
         <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
-            ? `3人版：単独はペア各人と個別決済（方法A）• ${(TEAM_MODES_3.find(t => t.id === displayTeamMode) ?? TEAM_MODES_3[0]).label.replace(/\n/g, " ")}`
-            : `4人版：${(TEAM_MODES_4.find(t => t.id === displayTeamMode) ?? TEAM_MODES_4[0]).label.replace(/\n/g, " ")}`}
+            ? `${t('rule3p')}${t(('tm_' + (displayTeamMode || 'order_1_23')) as I18nKey).replace(/\n/g, " ")}`
+            : `${t('rule4p')}${t(('tm_' + (displayTeamMode || 'order_14_23')) as I18nKey).replace(/\n/g, " ")}`}
         </div>
 
         {/* 通常モード: 保存ボタン + 招待 + 共有コード */}
@@ -2166,17 +2176,17 @@ export default function App() {
                 cursor: canSave ? "pointer" : "default",
               }}
             >
-              {saving ? "保存中..." : !isDirty ? "保存済み" : "ゲームの保存"}
+              {saving ? t('saving') : !isDirty ? t('saved') : t('saveGame')}
             </button>
             {!canSave && (
               <div style={{ fontSize: 9, color: "#3a5a3a", marginTop: 6 }}>
-                コース名・プレイヤー名をすべて入力してください
+                {t('enterAllNames')}
               </div>
             )}
             {/* 閲覧コード発行はオーナーのみ表示 */}
             {!isParticipant && (() => {
               const enabled = canSave && !isDirty;
-              const tip = isDirty ? "保存してから発行できます" : !canSave ? "コース名・プレイヤー名を入力してください" : "";
+              const tip = isDirty ? t('saveThenIssue') : !canSave ? t('enterNamesFirst') : "";
               return (
                 <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
                   <button
@@ -2192,7 +2202,7 @@ export default function App() {
                       opacity: enabled ? 1 : 0.4,
                     }}
                   >
-                    閲覧コードを発行
+                    {t('viewCode')}
                   </button>
                 </div>
               );
@@ -2200,9 +2210,9 @@ export default function App() {
             {viewCode && (
               <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                 <div style={{ padding: "10px 16px", background: "#0a160a", borderRadius: 10, border: "1px solid #2a4a6a", display: "inline-block" }}>
-                  <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>閲覧コード（読み取り専用）</div>
+                  <div style={{ fontSize: 9, color: "#4a7a9b", letterSpacing: 2, marginBottom: 4 }}>{t('viewCodeLabel')}</div>
                   <div style={{ fontSize: 26, fontWeight: "bold", letterSpacing: 8, color: "#f5f0e8" }}>{viewCode}</div>
-                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>再発行すると旧コードは無効になります</div>
+                  <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>{t('reissueNote')}</div>
                 </div>
               </div>
             )}
@@ -2211,17 +2221,17 @@ export default function App() {
               const last = accessLogs[0];
               return (
                 <div style={{ marginTop: 8, padding: "8px 12px", background: "#080f08", borderRadius: 8, border: "1px solid #1a3a1a" }}>
-                  <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 4 }}>アクセス状況（オーナーのみ表示）</div>
+                  <div style={{ fontSize: 9, color: "#6b8b6b", letterSpacing: 1, marginBottom: 4 }}>{t('accessStats')}</div>
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 11, color: "#c8d8c8" }}>
-                      総アクセス: <b style={{ color: GOLD }}>{accessLogs.length}</b> 回
+                      {t('totalAccess')}<b style={{ color: GOLD }}>{accessLogs.length}</b>{t('times')}
                     </span>
                     <span style={{ fontSize: 11, color: "#c8d8c8" }}>
-                      ユニーク: <b style={{ color: GOLD }}>{uniqueDevices}</b> 人
+                      {t('uniqueUsers')}<b style={{ color: GOLD }}>{uniqueDevices}</b>{t('people')}
                     </span>
                   </div>
                   <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 4 }}>
-                    最終アクセス: {new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
+                    {t('lastAccess')}{new Date(last.accessed_at).toLocaleString("ja-JP", JST)}
                   </div>
                 </div>
               );
@@ -2243,15 +2253,15 @@ export default function App() {
             textAlign: "center",
           }}>
             <div style={{ fontSize: 10, color: GOLD, letterSpacing: 3, marginBottom: 8 }}>WELCOME</div>
-            <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 6 }}>あなたの名前を教えてください</div>
+            <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 6 }}>{t('welcome')}</div>
             <div style={{ fontSize: 10, color: "#6b8b6b", marginBottom: 20 }}>
-              リーダーボードで使用されます
+              {t('welcomeSub')}
             </div>
             <input
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && nameInput.trim()) registerDisplayName(nameInput.trim()); }}
-              placeholder="例: 山田、タロウ"
+              placeholder={t('namePlaceholder')}
               autoFocus
               style={{
                 width: "100%", padding: "8px 10px", fontSize: 14, boxSizing: "border-box",
@@ -2269,7 +2279,7 @@ export default function App() {
                 background: nameInput.trim() ? "#2a1f00" : "transparent",
                 color: nameInput.trim() ? GOLD : "#3a5a3a",
               }}
-            >決定</button>
+            >{t('confirm')}</button>
           </div>
         </div>
       )}
@@ -2301,7 +2311,7 @@ export default function App() {
             <div style={{ padding: "8px 0" }}>
               {leaderboardData.length === 0 ? (
                 <div style={{ padding: "24px", textAlign: "center", color: "#4a6a4a", fontSize: 12 }}>
-                  まだデータがありません
+                  {t('noData')}
                 </div>
               ) : leaderboardData.map((entry, rank) => {
                 const pts = entry.total_pts;
@@ -2324,7 +2334,7 @@ export default function App() {
                         {pts > 0 ? `+${pts}` : `${pts}`}
                       </div>
                       <div style={{ fontSize: 9, color: "#4a6a4a" }}>
-                        {entry.session_count}ラウンド
+                        {entry.session_count}{t('rounds')}
                         {entry.last_played ? ` · ${formatDate(entry.last_played)}` : ""}
                       </div>
                     </div>
