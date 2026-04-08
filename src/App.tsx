@@ -50,6 +50,119 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", ...JST });
 }
 
+// ── canonical totals 計算用の純粋関数群（displayOpts に依存しない） ──────────
+
+function computeOrdersStatic(scores: string[][], n: number): number[][] {
+  const result: number[][] = [];
+  let order = Array.from({ length: n }, (_, i) => i);
+  for (let h = 0; h < HOLES; h++) {
+    result.push([...order]);
+    const s = scores[h];
+    if (s.slice(0, n).every(v => v !== "")) {
+      const snap = [...order];
+      order = snap.slice().sort((a, b) => {
+        const d = Number(s[a]) - Number(s[b]);
+        return d !== 0 ? d : snap.indexOf(a) - snap.indexOf(b);
+      });
+    }
+  }
+  return result;
+}
+
+function getTeams4Static(h: number, orders: number[][], teamMode: string): [number[], number[]] {
+  const order = orders[h];
+  switch (teamMode) {
+    case "fixed_12_34": return [[0, 1], [2, 3]];
+    case "fixed_13_24": return [[0, 2], [1, 3]];
+    case "fixed_14_23": return [[0, 3], [1, 2]];
+    case "order_14_23": return [[order[0], order[3]], [order[1], order[2]]];
+    case "bag_rotate":  return getRotateTeams(h, [0, 1, 2, 3]);
+    case "order_rotate":return getRotateTeams(h, order);
+    default: return [[0, 1], [2, 3]];
+  }
+}
+
+function computeCanonicalTotals(
+  scores: string[][],
+  pars: number[],
+  opts: Opts,
+  teamMode: string,
+  mode: 3 | 4,
+  pushCounts: number[]
+): number[] {
+  const n = mode;
+  const orders = computeOrdersStatic(scores, n);
+  const t = Array(4).fill(0);
+
+  if (mode === 3) {
+    let carry = 1;
+    orders.forEach((order, h) => {
+      const s = scores[h];
+      if (s.slice(0, 3).some(v => v === "")) return;
+      const par = pars[h];
+      let solo: number, pair: number[];
+      if      (teamMode === "fixed_1_23") { solo = 0; pair = [1, 2]; }
+      else if (teamMode === "fixed_2_13") { solo = 1; pair = [0, 2]; }
+      else if (teamMode === "fixed_3_12") { solo = 2; pair = [0, 1]; }
+      else                                { solo = order[0]; pair = [order[1], order[2]]; }
+      const ss = Number(s[solo]);
+      const ps = pair.map(pi => Number(s[pi]));
+      let soloTeam = ss * 11;
+      let lo = Math.min(...ps), hi = Math.max(...ps);
+      if (opts.birdieReverse && ss < par) [lo, hi] = [hi, lo];
+      let pairTeam = lo * 10 + hi;
+      if (opts.truncate) {
+        soloTeam = Math.floor(soloTeam / 10) * 10;
+        pairTeam = Math.floor(pairTeam / 10) * 10;
+      }
+      const diff = pairTeam - soloTeam;
+      const pushMult = opts.push ? Math.pow(2, pushCounts[h]) : 1;
+      const mult = carry * pushMult;
+      if (diff === 0 && opts.carry) { carry++; return; }
+      carry = 1;
+      const x = Math.abs(diff) * mult;
+      if (diff < 0) { t[solo] += -x * 2; pair.forEach(p => { t[p] += x; }); }
+      else           { t[solo] += x * 2; pair.forEach(p => { t[p] += -x; }); }
+    });
+  } else {
+    let carry = 1;
+    for (let h = 0; h < HOLES; h++) {
+      const s = scores[h];
+      if (s.slice(0, 4).some(v => v === "")) continue;
+      const par = pars[h];
+      const [tA, tB] = getTeams4Static(h, orders, teamMode);
+      const sA = tA.map(pi => Number(s[pi]));
+      const sB = tB.map(pi => Number(s[pi]));
+      let loA = Math.min(...sA), hiA = Math.max(...sA);
+      let loB = Math.min(...sB), hiB = Math.max(...sB);
+      if (opts.birdieReverse) {
+        if (sA.some(sc => sc < par)) [loB, hiB] = [hiB, loB];
+        if (sB.some(sc => sc < par)) [loA, hiA] = [hiA, loA];
+      }
+      let scA = loA * 10 + hiA;
+      let scB = loB * 10 + hiB;
+      if (opts.truncate) {
+        scA = Math.floor(scA / 10) * 10;
+        scB = Math.floor(scB / 10) * 10;
+      }
+      const diff = scB - scA;
+      const pushMult = opts.push ? Math.pow(2, pushCounts[h]) : 1;
+      const mult = carry * pushMult;
+      if (diff === 0 && opts.carry) { carry++; continue; }
+      carry = 1;
+      const x = Math.abs(diff) * mult;
+      if (diff > 0) {
+        tA.forEach(p => { t[p] += x; }); tB.forEach(p => { t[p] += -x; });
+      } else if (diff < 0) {
+        tA.forEach(p => { t[p] += -x; }); tB.forEach(p => { t[p] += x; });
+      }
+    }
+  }
+  return t;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function App() {
   const [mode, setMode] = useState<3 | 4>(4);
   const [courseName, setCourseName] = useState("");
@@ -796,9 +909,14 @@ export default function App() {
   async function saveSession() {
     if (!canSave || saving) return;
     setSaving(true);
+    // canonical opts/teamMode で totals を再計算（参加者の localOpts 汚染を排除）
+    const canonicalTotals = computeCanonicalTotals(scores, pars, opts, teamMode, mode, pushCounts);
+    // olympic totals（opts.olympic が正規の判定基準）
+    const olTotals = opts.olympic ? olympicTotals : Array(n).fill(0);
     await supabase.from("sessions").upsert({
       id: getSessionId(),
-      device_id: getDeviceId(),
+      device_id: getDeviceId(),             // トリガーにより UPDATE 時は上書き不可
+      last_editor_device_id: getDeviceId(), // 最終編集者を別途記録
       updated_at: new Date().toISOString(),
       mode: n,
       team_mode: teamMode,
@@ -807,15 +925,16 @@ export default function App() {
       pars,
       scores,
       opts,
-      totals,
+      totals: canonicalTotals,
+      olympic_totals: olTotals,
       front_label: frontLabel,
       back_label: backLabel,
     });
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
 
-    // course_sections へ par データを投稿（best-effort）
-    if (courseName.trim()) {
+    // course_sections へ par データを投稿（オーナーのみ・best-effort）
+    if (courseName.trim() && !isParticipant) {
       try {
         // courses: 同名コースがなければ insert（あれば select）
         let { data: course } = await supabase
