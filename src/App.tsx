@@ -636,7 +636,14 @@ export default function App() {
       device_id: getDeviceId(),
       display_name: name,
     });
-    if (error) { alert(`名前の登録に失敗しました: ${error.message}`); return; }
+    if (error) {
+      if (error.code === "23505") {
+        alert(`「${name}」はすでに他の端末で使用されています。別の名前を入力してください。`);
+      } else {
+        alert(`名前の登録に失敗しました: ${error.message}`);
+      }
+      return;
+    }
     setDisplayName(name);
     setNames(prev => prev.map((n, i) => i === 0 && /^Player\d+$/.test(n) ? name : n));
     setShowNameRegistration(false);
