@@ -330,12 +330,16 @@ export default function App() {
           setCourseNameValid(!!data.course_name);
           setSessionDisplayDate(formatDate(data.updated_at));
           setSelectedGroupId((data as any).group_id ?? null);
+          setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+          setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
             names: data.names, scores: data.scores,
             opts: data.opts, mode: data.mode, teamMode: data.team_mode,
             frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
             groupId: (data as any).group_id ?? null,
+            olympicMedals: (data as any).olympic_medals ?? [],
+            pushCounts: (data as any).push_counts ?? [],
           }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -364,12 +368,16 @@ export default function App() {
         setCourseNameValid(!!data.course_name);
         setSessionDisplayDate(formatDate(data.updated_at));
         setSelectedGroupId((data as any).group_id ?? null);
+        setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+        setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
           names: data.names, scores: data.scores,
           opts: data.opts, mode: data.mode, teamMode: data.team_mode,
           frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
           groupId: (data as any).group_id ?? null,
+          olympicMedals: (data as any).olympic_medals ?? [],
+          pushCounts: (data as any).push_counts ?? [],
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -394,12 +402,16 @@ export default function App() {
           setBackLabel(d.back_label ?? "");
           setCourseNameValid(!!d.course_name);
           setSelectedGroupId(d.group_id ?? null);
+          setOlympicMedals(d.olympic_medals?.length ? d.olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+          setPushCounts(d.push_counts?.length ? d.push_counts : Array(HOLES).fill(0));
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
             names: d.names, scores: d.scores,
             opts: d.opts, mode: d.mode, teamMode: d.team_mode,
             frontLabel: d.front_label ?? "", backLabel: d.back_label ?? "",
             groupId: d.group_id ?? null,
+            olympicMedals: d.olympic_medals ?? [],
+            pushCounts: d.push_counts ?? [],
           }));
         }
       )
@@ -483,12 +495,16 @@ export default function App() {
     setCourseNameValid(!!data.course_name);
     setSessionDisplayDate(formatDate(data.updated_at));
     setSelectedGroupId((data as any).group_id ?? null);
+    setOlympicMedals((data as any).olympic_medals?.length ? (data as any).olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+    setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
       names: data.names, scores: data.scores,
       opts: data.opts, mode: data.mode, teamMode: data.team_mode,
       frontLabel: data.front_label ?? "", backLabel: data.back_label ?? "",
       groupId: (data as any).group_id ?? null,
+      olympicMedals: (data as any).olympic_medals ?? [],
+      pushCounts: (data as any).push_counts ?? [],
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -882,8 +898,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId }),
-    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -1047,6 +1063,8 @@ export default function App() {
       opts,
       totals: canonicalTotals,
       olympic_totals: olTotals,
+      olympic_medals: olympicMedals,
+      push_counts: pushCounts,
       group_id: selectedGroupId,
       front_label: frontLabel,
       back_label: backLabel,
