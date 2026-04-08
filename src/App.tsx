@@ -1213,7 +1213,7 @@ export default function App() {
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
         <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
-        <button onClick={() => { window.location.href = lang === "ja" ? "/zh/" : "/"; }} style={{
+        <button onClick={() => { window.location.href = lang === "ja" ? "/zh/index.html" : "/index.html"; }} style={{
           position: "absolute", top: 14, right: 44,
           background: lang === "zh" ? "#2a1f00" : "transparent",
           border: `1px solid ${lang === "zh" ? GOLD : "#2a4a2a"}`,
