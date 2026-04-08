@@ -322,15 +322,15 @@ export default function App() {
     const deviceId = getDeviceId();
     fetch("https://api.ipify.org?format=json").catch(() => null)
       .then(r => r ? r.json() : { ip: null })
-      .then(({ ip }) => {
-        supabase.from("site_access_logs").insert({
+      .then(async ({ ip }) => {
+        await supabase.from("site_access_logs").insert({
           device_id: deviceId,
           ip_address: ip,
           user_agent: navigator.userAgent,
           url_params: urlParams,
         });
-        // 訪問者サマリー更新（デバイス × 日次 × IP の新規組み合わせのみカウント）
-        supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
+        // 訪問者サマリー更新（デバイス × IP の新規 or カウント+1）
+        await supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
