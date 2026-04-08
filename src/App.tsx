@@ -369,6 +369,7 @@ export default function App() {
     setPars(Array(HOLES).fill(4));
     setOpts({ carry: false, birdieReverse: false, truncate: false, push: false, olympic: false });
     setOlympicMedals(Array(HOLES).fill(null).map(() => Array(4).fill(null)));
+    setOlympicPts({ gold: 5, silver: 3, bronze: 2, iron: 1 });
     setPushCounts(Array(HOLES).fill(0));
     setTeamMode("order_1_23");
     setFrontLabel("");
@@ -393,6 +394,7 @@ export default function App() {
 
   const setScore = (h: number, pi: number, v: string) => {
     if (v !== "" && !/^\d+$/.test(v)) return;
+    if (v === "0") return; // スコア0は入力不可
     setScores(prev => prev.map((row, rh) =>
       rh === h ? row.map((s, rp) => rp === pi ? v : s) : row
     ));
