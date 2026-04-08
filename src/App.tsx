@@ -244,6 +244,7 @@ export default function App() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [leaderboardGroupName, setLeaderboardGroupName] = useState("");
   const [lang] = useState<Lang>(getLangFromPath);
+  const [lvMode, setLvMode] = useState(true);
   const t = (key: I18nKey) => i18n[lang][key];
 
   const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
@@ -386,6 +387,7 @@ export default function App() {
           setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
           setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
           setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+          setLvMode((data as any).lv_mode !== false);
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
             names: data.names, scores: data.scores,
@@ -396,6 +398,7 @@ export default function App() {
             pushCounts: (data as any).push_counts ?? [],
             handicaps: (data as any).handicaps ?? [],
             strokeIndexes: (data as any).stroke_indexes ?? [],
+            lvMode: (data as any).lv_mode ?? true,
           }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -428,6 +431,7 @@ export default function App() {
         setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
         setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
         setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+        setLvMode((data as any).lv_mode !== false);
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
           names: data.names, scores: data.scores,
@@ -438,6 +442,7 @@ export default function App() {
           pushCounts: (data as any).push_counts ?? [],
           handicaps: (data as any).handicaps ?? [],
           strokeIndexes: (data as any).stroke_indexes ?? [],
+          lvMode: (data as any).lv_mode ?? true,
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -464,6 +469,7 @@ export default function App() {
           setSelectedGroupId(d.group_id ?? null);
           setOlympicMedals(d.olympic_medals?.length ? d.olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
           setPushCounts(d.push_counts?.length ? d.push_counts : Array(HOLES).fill(0));
+          setLvMode(d.lv_mode !== false);
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
             names: d.names, scores: d.scores,
@@ -472,6 +478,7 @@ export default function App() {
             groupId: d.group_id ?? null,
             olympicMedals: d.olympic_medals ?? [],
             pushCounts: d.push_counts ?? [],
+            lvMode: d.lv_mode ?? true,
           }));
         }
       )
@@ -559,6 +566,7 @@ export default function App() {
     setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
     setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
     setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+    setLvMode((data as any).lv_mode !== false);
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
       names: data.names, scores: data.scores,
@@ -569,6 +577,7 @@ export default function App() {
       pushCounts: (data as any).push_counts ?? [],
       handicaps: (data as any).handicaps ?? [],
       strokeIndexes: (data as any).stroke_indexes ?? [],
+      lvMode: (data as any).lv_mode ?? true,
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -703,6 +712,7 @@ export default function App() {
     setPushCounts(Array(HOLES).fill(0));
     setHandicaps([0, 0, 0, 0]);
     setStrokeIndexes(Array.from({ length: 18 }, (_, i) => i + 1));
+    setLvMode(true);
     setTeamMode("order_1_23");
     setFrontLabel("");
     setBackLabel("");
@@ -985,8 +995,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes }),
-    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -1083,6 +1093,7 @@ export default function App() {
       courseName: data.course_name ?? "",
       names: data.names, scores: data.scores,
       opts: data.opts, mode: data.mode, teamMode: data.team_mode,
+      lvMode: (data as any).lv_mode ?? true,
     });
     setMode(data.mode as 3 | 4);
     setCourseName(data.course_name ?? "");
@@ -1097,6 +1108,7 @@ export default function App() {
     setSessionDisplayDate(formatDate(data.updated_at));
     setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
     setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+    setLvMode((data as any).lv_mode !== false);
     setSavedSnapshot(snap);
     if (tokenData.role === "join") {
       localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -1159,6 +1171,7 @@ export default function App() {
       back_label: backLabel,
       handicaps,
       stroke_indexes: strokeIndexes,
+      lv_mode: lvMode,
     });
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
@@ -1212,7 +1225,27 @@ export default function App() {
         position: "relative",
       }}>
         <div style={{ fontSize: 10, letterSpacing: 4, color: GOLD, marginBottom: 4 }}>GOLF BETTING GAME</div>
-        <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <div style={{ fontSize: 22, fontWeight: "bold" }}>Las Vegas</div>
+          <div
+            onClick={() => { if (!isSettingsLocked) setLvMode(v => !v); }}
+            style={{
+              width: 36, height: 20, borderRadius: 10, cursor: isSettingsLocked ? "default" : "pointer",
+              background: lvMode ? "#2a1f00" : "#1a2a1a",
+              border: `1.5px solid ${lvMode ? GOLD : "#3a5a3a"}`,
+              position: "relative", transition: "background 0.2s",
+              opacity: isSettingsLocked ? 0.5 : 1,
+            }}
+          >
+            <div style={{
+              width: 14, height: 14, borderRadius: 7,
+              background: lvMode ? GOLD : "#4a6a4a",
+              position: "absolute", top: 2,
+              left: lvMode ? 18 : 2,
+              transition: "left 0.2s, background 0.2s",
+            }} />
+          </div>
+        </div>
         <button onClick={() => { window.location.href = lang === "ja" ? "/zh/index.html" : "/index.html"; }} style={{
           position: "absolute", top: 14, right: 44,
           background: lang === "zh" ? "#2a1f00" : "transparent",
@@ -1681,6 +1714,7 @@ export default function App() {
         </div>
 
         {/* 4人チーム分け */}
+        {lvMode && (
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "10px 12px", marginBottom: 8, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>{t('teamDiv')}</div>
           {(isParticipant || isSharedView || isAdminMode) && (
@@ -1716,8 +1750,10 @@ export default function App() {
             })}
           </div>
         </div>
+        )}
 
         {/* Options */}
+        {lvMode && (
         <div style={{ background: "#0f1f0f", borderRadius: 10, padding: "8px 12px", marginBottom: 10, border: "1px solid #2a4a2a" }}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: GOLD, marginBottom: 6 }}>{t('options')}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, pointerEvents: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? "none" : "auto", opacity: (isSettingsLocked && !isParticipant && !isSharedView && !isAdminMode) ? 0.6 : 1 }}>
@@ -1776,6 +1812,7 @@ export default function App() {
             )}
           </div>
         </div>
+        )}
 
         {/* Score grid */}
         <div style={{ background: "#0f1f0f", borderRadius: 10, border: "1px solid #2a4a2a", overflow: "hidden", marginBottom: 10 }}>
@@ -1866,7 +1903,7 @@ export default function App() {
                         background: isSolo ? "rgba(200,169,110,0.06)"
                           : isTeamA ? "rgba(200,169,110,0.03)" : "rgba(74,155,127,0.03)",
                       }}>
-                        {mode === 4 && (
+                        {lvMode && mode === 4 && (
                           <div style={{ fontSize: 7, textAlign: "center", color: isTeamA ? GOLD : GREEN, marginBottom: 1 }}>
                             {isTeamA ? "A" : "B"}
                           </div>
@@ -1941,13 +1978,13 @@ export default function App() {
                             );
                           })()}
                         </div>
-                        {isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>{t('solo')}</div>}
+                        {lvMode && isSolo && <div style={{ fontSize: 7, textAlign: "center", color: GOLD, marginTop: 1 }}>{t('solo')}</div>}
                       </div>
                     );
                   })}
                 </div>
 
-                {r && !r.tied && (
+                {lvMode && r && !r.tied && (
                   <div style={{ display: "grid", gridTemplateColumns: gridCols, background: "#080f08" }}>
                     <div style={{ padding: "2px", textAlign: "center", fontSize: 8, color: "#3a5a3a", display: "flex", alignItems: "center", justifyContent: "center" }}>pt</div>
                     {Array.from({ length: n }, (_, pi) => {
@@ -1964,7 +2001,7 @@ export default function App() {
                     })}
                   </div>
                 )}
-                {r && r.tied && (
+                {lvMode && r && r.tied && (
                   <div style={{ padding: "2px 8px", background: "#080f08", fontSize: 8, color: GOLD, textAlign: "center" }}>
                     {t('tieNext')}{r.mult + 1}
                   </div>
@@ -1990,11 +2027,11 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
                           fontSize: 13, fontWeight: "bold",
-                          color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : "#f5f0e8",
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                         }}>
-                          <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
-                          {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
+                          {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
+                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
                         </div>
                       );
                     })}
@@ -2041,11 +2078,11 @@ export default function App() {
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
                           fontSize: 13, fontWeight: "bold",
-                          color: pt > 0 ? GOLD : pt < 0 ? RED : DIM,
+                          color: lvMode ? (pt > 0 ? GOLD : pt < 0 ? RED : DIM) : "#f5f0e8",
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
                         }}>
-                          <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>
-                          {gs > 0 && <span style={{ fontSize: 8, color: "#f5f0e8", fontWeight: "normal", lineHeight: 1 }}>{gs}</span>}
+                          {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
+                          {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
                         </div>
                       );
                     })}
@@ -2100,14 +2137,18 @@ export default function App() {
               <span style={{ fontSize: 14, color: "#c8d8c8" }}>{names[pi]}</span>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                 <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  {lvMode && (
                   <span style={{
                     fontSize: 20, fontWeight: "bold",
                     color: totals[pi] > 0 ? GOLD : totals[pi] < 0 ? RED : DIM,
                   }}>
                     {totals[pi] > 0 ? `+${totals[pi]}` : totals[pi]}
                   </span>
+                  )}
                   {grossTotals[pi] > 0 && (
-                    <span style={{ fontSize: 11, color: "#f5f0e8", fontWeight: "normal" }}>({grossTotals[pi]})</span>
+                    <span style={{ fontSize: lvMode ? 11 : 20, color: "#f5f0e8", fontWeight: lvMode ? "normal" : "bold" }}>
+                      {lvMode ? `(${grossTotals[pi]})` : grossTotals[pi]}
+                    </span>
                   )}
                 </span>
                 {displayOpts.olympic && olympicTotals[pi] !== 0 && (
@@ -2120,7 +2161,7 @@ export default function App() {
           ))}
 
           {/* 精算 */}
-          {settlement.length > 0 && (
+          {lvMode && settlement.length > 0 && (
             <>
               <div style={{
                 margin: "12px 0 10px",
@@ -2156,11 +2197,13 @@ export default function App() {
           )}
         </div>
 
+        {lvMode && (
         <div style={{ textAlign: "center", fontSize: 8, color: "#2a4a2a", marginTop: 10, letterSpacing: 1 }}>
           {mode === 3
             ? `${t('rule3p')}${t(('tm_' + (displayTeamMode || 'order_1_23')) as I18nKey).replace(/\n/g, " ")}`
             : `${t('rule4p')}${t(('tm_' + (displayTeamMode || 'order_14_23')) as I18nKey).replace(/\n/g, " ")}`}
         </div>
+        )}
 
         {/* 通常モード: 保存ボタン + 招待 + 共有コード */}
         {!isViewing && !isSharedView && (
