@@ -561,6 +561,15 @@ export default function App() {
     setNewGroupName("");
   }
 
+  // グループ削除
+  async function deleteGroup(groupId: string) {
+    if (!window.confirm("このグループを削除しますか？")) return;
+    const { error } = await supabase.from("groups").delete().eq("id", groupId);
+    if (error) { alert(`削除に失敗しました: ${error.message}`); return; }
+    setGroupList(prev => prev.filter(g => g.id !== groupId));
+    if (selectedGroupId === groupId) setSelectedGroupId(null);
+  }
+
   // 初回名前登録
   async function registerDisplayName(name: string) {
     const { error } = await supabase.from("device_profiles").upsert({
@@ -1429,20 +1438,28 @@ export default function App() {
                       }}>解除</button>
                     </>
                   ) : (
-                    <select
-                      value=""
-                      onChange={e => { const g = groupList.find(g => g.id === e.target.value); if (g) applyGroup(g); }}
-                      style={{
-                        flex: 1, padding: "3px 4px", fontSize: 10,
-                        background: "#1a2e1a", border: "1px solid #2a4a2a",
-                        borderRadius: 6, color: "#f5f0e8", outline: "none",
-                      }}
-                    >
-                      <option value="">-- グループを選択 --</option>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                       {groupList.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}（{g.mode}人）</option>
+                        <div key={g.id} style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                          <button
+                            onClick={() => applyGroup(g)}
+                            style={{
+                              flex: 1, padding: "3px 6px", fontSize: 10, textAlign: "left",
+                              background: "#1a2e1a", border: "1px solid #2a4a2a",
+                              borderRadius: 6, color: "#f5f0e8", cursor: "pointer",
+                            }}
+                          >{g.name}（{g.mode}人）</button>
+                          <button
+                            onClick={() => deleteGroup(g.id)}
+                            style={{
+                              padding: "3px 7px", fontSize: 10, borderRadius: 6, flexShrink: 0,
+                              border: "1px solid #3a2a2a", background: "transparent",
+                              color: "#6a4a4a", cursor: "pointer",
+                            }}
+                          >×</button>
+                        </div>
                       ))}
-                    </select>
+                    </div>
                   )}
                 </div>
               )}
