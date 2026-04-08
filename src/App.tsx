@@ -2313,8 +2313,19 @@ export default function App() {
           <div style={{
             background: T.bgCard, border: `2px solid ${GOLD}`,
             borderRadius: 12, padding: "28px 24px", width: "min(320px, 90vw)",
-            textAlign: "center",
+            textAlign: "center", position: "relative",
           }}>
+            <button
+              onClick={() => { setShowNameRegistration(false); setNameInput(""); }}
+              style={{
+                position: "absolute", top: 10, right: 10,
+                width: 36, height: 36, borderRadius: "50%",
+                border: `1px solid ${T.border}`, background: "transparent",
+                color: T.textDim, fontSize: 20, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                lineHeight: 1,
+              }}
+            >×</button>
             <div style={{ fontSize: 10, color: GOLD, letterSpacing: 3, marginBottom: 8 }}>WELCOME</div>
             <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 6 }}>{t('welcome')}</div>
             <div style={{ fontSize: 10, color: T.textDim, marginBottom: 20 }}>
@@ -2323,7 +2334,12 @@ export default function App() {
             <input
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && nameInput.trim()) registerDisplayName(nameInput.trim()); }}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  if (nameInput.trim()) registerDisplayName(nameInput.trim());
+                  else { setShowNameRegistration(false); setNameInput(""); }
+                }
+              }}
               placeholder={t('namePlaceholder')}
               autoFocus
               style={{
@@ -2333,14 +2349,16 @@ export default function App() {
               }}
             />
             <button
-              onClick={() => { if (nameInput.trim()) registerDisplayName(nameInput.trim()); }}
-              disabled={!nameInput.trim()}
+              onClick={() => {
+                if (nameInput.trim()) registerDisplayName(nameInput.trim());
+                else { setShowNameRegistration(false); setNameInput(""); }
+              }}
               style={{
                 width: "100%", padding: "10px 0", fontSize: 14, fontWeight: "bold",
-                borderRadius: 8, cursor: nameInput.trim() ? "pointer" : "default",
+                borderRadius: 8, cursor: "pointer",
                 border: `1px solid ${nameInput.trim() ? GOLD : T.border}`,
                 background: nameInput.trim() ? "#2a1f00" : "transparent",
-                color: nameInput.trim() ? GOLD : "#3a5a3a",
+                color: nameInput.trim() ? GOLD : T.textDim,
               }}
             >{t('confirm')}</button>
           </div>
