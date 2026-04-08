@@ -520,16 +520,16 @@ export default function App() {
   // names[] がグループのメンバー構成と完全一致したら自動でグループを選択
   useEffect(() => {
     if (selectedGroupId || groupList.length === 0 || isSettingsLocked) return;
-    const sessionNames = names.slice(0, n).map(nm => nm.trim()).sort();
+    const sessionNames = names.slice(0, mode).map(nm => nm.trim()).sort();
     if (sessionNames.some(nm => /^Player\d+$/.test(nm) || nm === "")) return;
     const match = groupList.find(g => {
-      if (g.mode !== n) return false;
+      if (g.mode !== mode) return false;
       const gNames = [...g.member_names].sort();
       return gNames.length === sessionNames.length &&
         JSON.stringify(gNames) === JSON.stringify(sessionNames);
     });
     if (match) setSelectedGroupId(match.id);
-  }, [names, n, groupList, selectedGroupId, isSettingsLocked]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [names, mode, groupList, selectedGroupId, isSettingsLocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 履歴から読み込み（閲覧モード）
   async function loadSessionById(id: string) {
