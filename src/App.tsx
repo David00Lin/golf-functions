@@ -263,19 +263,22 @@ export default function App() {
     if (backLabel)  tryAutofillPars(backLabel, 9);
   }, [courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // サイトアクセスログ記録（初回マウント時のみ）
+  // サイトアクセスログ記録 + 訪問者カウント更新（初回マウント時のみ）
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlParams = params.toString() || null;
+    const deviceId = getDeviceId();
     fetch("https://api.ipify.org?format=json").catch(() => null)
       .then(r => r ? r.json() : { ip: null })
       .then(({ ip }) => {
         supabase.from("site_access_logs").insert({
-          device_id: getDeviceId(),
+          device_id: deviceId,
           ip_address: ip,
           user_agent: navigator.userAgent,
           url_params: urlParams,
         });
+        // 訪問者サマリー更新（デバイス × 日次 × IP の新規組み合わせのみカウント）
+        supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
