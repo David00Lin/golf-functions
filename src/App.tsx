@@ -946,6 +946,30 @@ export default function App() {
     );
   }, [scores]);
 
+  const puttsHalf = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      putts.slice(0, 9).reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    ), [putts]);
+
+  const puttsBack = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      putts.slice(9, 18).reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    ), [putts]);
+
+  const puttsTotal = useMemo(() =>
+    Array.from({ length: 4 }, (_, pi) =>
+      putts.reduce((sum, row) => {
+        const v = parseInt(row[pi], 10);
+        return sum + (isNaN(v) ? 0 : v);
+      }, 0)
+    ), [putts]);
+
   const MEDAL_PTS = (medal: string | null) => {
     if (!medal) return 0;
     if (medal === "金") return olympicPts.gold;
@@ -2086,6 +2110,7 @@ export default function App() {
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = backTotals[pi];
                       const gs = grossBack[pi];
+                      const pp = puttsBack[pi];
                       return (
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
@@ -2095,6 +2120,7 @@ export default function App() {
                         }}>
                           {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
                           {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: T.text, fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
+                          {pp > 0 && <span style={{ fontSize: 8, color: "#4a9bdb", lineHeight: 1 }}>P{pp}</span>}
                         </div>
                       );
                     })}
@@ -2137,6 +2163,7 @@ export default function App() {
                     {Array.from({ length: n }, (_, pi) => {
                       const pt = halfTotals[pi];
                       const gs = grossHalf[pi];
+                      const pp = puttsHalf[pi];
                       return (
                         <div key={pi} style={{
                           ...cell, padding: "5px 3px", textAlign: "center",
@@ -2146,6 +2173,7 @@ export default function App() {
                         }}>
                           {lvMode && <span>{pt > 0 ? `+${pt}` : pt === 0 ? "-" : pt}</span>}
                           {gs > 0 && <span style={{ fontSize: lvMode ? 8 : 13, color: T.text, fontWeight: lvMode ? "normal" : "bold", lineHeight: 1 }}>{gs}</span>}
+                          {pp > 0 && <span style={{ fontSize: 8, color: "#4a9bdb", lineHeight: 1 }}>P{pp}</span>}
                         </div>
                       );
                     })}
@@ -2212,6 +2240,9 @@ export default function App() {
                     <span style={{ fontSize: lvMode ? 11 : 20, color: T.text, fontWeight: lvMode ? "normal" : "bold" }}>
                       {lvMode ? `(${grossTotals[pi]})` : grossTotals[pi]}
                     </span>
+                  )}
+                  {puttsTotal[pi] > 0 && (
+                    <span style={{ fontSize: 11, color: "#4a9bdb" }}>P{puttsTotal[pi]}</span>
                   )}
                 </span>
                 {displayOpts.olympic && olympicTotals[pi] !== 0 && (
