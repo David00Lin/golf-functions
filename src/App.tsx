@@ -216,7 +216,10 @@ export default function App() {
   const [courseSuggestions, setCourseSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [courseNameValid, setCourseNameValid] = useState(false);
-  const [activeCell, setActiveCell] = useState<{ h: number; pi: number } | null>(null);
+  const [activeCell, setActiveCell] = useState<{ h: number; pi: number; type: "score" | "putts" } | null>(null);
+  const [putts, setPutts] = useState<string[][]>(() =>
+    Array(HOLES).fill(null).map(() => Array(4).fill(""))
+  );
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const isViewing = viewingSessionId !== null;
   const [isSharedView, setIsSharedView] = useState(false);
@@ -387,6 +390,7 @@ export default function App() {
           setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
           setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
           setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+          setPutts((data as any).putts?.length ? (data as any).putts : Array(HOLES).fill(null).map(() => Array(4).fill("")));
           setLvMode((data as any).lv_mode !== false);
           setSavedSnapshot(JSON.stringify({
             courseName: data.course_name ?? "",
@@ -399,6 +403,7 @@ export default function App() {
             handicaps: (data as any).handicaps ?? [],
             strokeIndexes: (data as any).stroke_indexes ?? [],
             lvMode: (data as any).lv_mode ?? true,
+            putts: (data as any).putts ?? [],
           }));
           if (tokenData.role === "join") {
             localStorage.setItem("golf_session_id", tokenData.session_id);
@@ -431,6 +436,7 @@ export default function App() {
         setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
         setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
         setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+        setPutts((data as any).putts?.length ? (data as any).putts : Array(HOLES).fill(null).map(() => Array(4).fill("")));
         setLvMode((data as any).lv_mode !== false);
         setSavedSnapshot(JSON.stringify({
           courseName: data.course_name ?? "",
@@ -443,6 +449,7 @@ export default function App() {
           handicaps: (data as any).handicaps ?? [],
           strokeIndexes: (data as any).stroke_indexes ?? [],
           lvMode: (data as any).lv_mode ?? true,
+          putts: (data as any).putts ?? [],
         }));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -469,6 +476,7 @@ export default function App() {
           setSelectedGroupId(d.group_id ?? null);
           setOlympicMedals(d.olympic_medals?.length ? d.olympic_medals : Array(HOLES).fill(null).map(() => Array(4).fill(null)));
           setPushCounts(d.push_counts?.length ? d.push_counts : Array(HOLES).fill(0));
+          setPutts(d.putts?.length ? d.putts : Array(HOLES).fill(null).map(() => Array(4).fill("")));
           setLvMode(d.lv_mode !== false);
           setSavedSnapshot(JSON.stringify({
             courseName: d.course_name ?? "",
@@ -479,6 +487,7 @@ export default function App() {
             olympicMedals: d.olympic_medals ?? [],
             pushCounts: d.push_counts ?? [],
             lvMode: d.lv_mode ?? true,
+            putts: d.putts ?? [],
           }));
         }
       )
@@ -566,6 +575,7 @@ export default function App() {
     setPushCounts((data as any).push_counts?.length ? (data as any).push_counts : Array(HOLES).fill(0));
     setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
     setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+    setPutts((data as any).putts?.length ? (data as any).putts : Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setLvMode((data as any).lv_mode !== false);
     setSavedSnapshot(JSON.stringify({
       courseName: data.course_name ?? "",
@@ -578,6 +588,7 @@ export default function App() {
       handicaps: (data as any).handicaps ?? [],
       strokeIndexes: (data as any).stroke_indexes ?? [],
       lvMode: (data as any).lv_mode ?? true,
+      putts: (data as any).putts ?? [],
     }));
     setViewingSessionId(id);
     setIsParticipant(false); // 自分の履歴 = オーナー扱い
@@ -712,6 +723,7 @@ export default function App() {
     setPushCounts(Array(HOLES).fill(0));
     setHandicaps([0, 0, 0, 0]);
     setStrokeIndexes(Array.from({ length: 18 }, (_, i) => i + 1));
+    setPutts(Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setLvMode(true);
     setTeamMode("order_1_23");
     setFrontLabel("");
@@ -747,7 +759,15 @@ export default function App() {
 
   function handleNumpad(key: string) {
     if (!activeCell) return;
-    const { h, pi } = activeCell;
+    const { h, pi, type } = activeCell;
+    if (type === "putts") {
+      if (key === "⌫") {
+        setPutts(prev => prev.map((row, rh) => rh === h ? row.map((s, rp) => rp === pi ? "" : s) : row));
+      } else {
+        setPutts(prev => prev.map((row, rh) => rh === h ? row.map((s, rp) => rp === pi ? key : s) : row));
+      }
+      return;
+    }
     const cur = scores[h][pi];
     if (key === "⌫") { setScore(h, pi, cur.slice(0, -1)); return; }
     if (cur.length >= 2) { setScore(h, pi, key); return; }
@@ -995,8 +1015,8 @@ export default function App() {
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const currentSnapshot = useMemo(() =>
-    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode }),
-    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode]
+    JSON.stringify({ courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, groupId: selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode, putts }),
+    [courseName, names, scores, opts, mode, teamMode, frontLabel, backLabel, selectedGroupId, olympicMedals, pushCounts, handicaps, strokeIndexes, lvMode, putts]
   );
   const isDirty = savedSnapshot !== currentSnapshot;
 
@@ -1108,6 +1128,7 @@ export default function App() {
     setSessionDisplayDate(formatDate(data.updated_at));
     setHandicaps((data as any).handicaps?.length ? (data as any).handicaps : [0, 0, 0, 0]);
     setStrokeIndexes((data as any).stroke_indexes?.length ? (data as any).stroke_indexes : Array.from({ length: 18 }, (_, i) => i + 1));
+    setPutts((data as any).putts?.length ? (data as any).putts : Array(HOLES).fill(null).map(() => Array(4).fill("")));
     setLvMode((data as any).lv_mode !== false);
     setSavedSnapshot(snap);
     if (tokenData.role === "join") {
@@ -1172,6 +1193,7 @@ export default function App() {
       handicaps,
       stroke_indexes: strokeIndexes,
       lv_mode: lvMode,
+      putts,
     });
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
@@ -1929,14 +1951,14 @@ export default function App() {
                         )}
                         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                           <div
-                            onClick={() => { if (!isReadOnly) setActiveCell({ h, pi }); }}
+                            onClick={() => { if (!isReadOnly) setActiveCell({ h, pi, type: "score" }); }}
                             style={{
                               flex: 1, boxSizing: "border-box",
                               padding: "7px 0", textAlign: "center",
-                              background: activeCell?.h === h && activeCell?.pi === pi
+                              background: activeCell?.h === h && activeCell?.pi === pi && activeCell?.type === "score"
                                 ? "rgba(200,169,110,0.15)" : "transparent",
                               border: `1.5px solid ${
-                                activeCell?.h === h && activeCell?.pi === pi ? GOLD
+                                activeCell?.h === h && activeCell?.pi === pi && activeCell?.type === "score" ? GOLD
                                 : isSolo ? "#3a2e00" : isTeamA ? "#2a2000" : "#1a3a2e"
                               }`,
                               borderRadius: 6,
@@ -1949,6 +1971,28 @@ export default function App() {
                               opacity: isReadOnly ? 0.8 : 1,
                             }}
                           >{sc ? (hcStrokes && hcStrokes[pi]?.[h] ? `${sc}·` : sc) : "·"}</div>
+                          {/* パット数入力 */}
+                          <div
+                            onClick={() => { if (!isReadOnly) setActiveCell({ h, pi, type: "putts" }); }}
+                            style={{
+                              width: 22, minHeight: 32, boxSizing: "border-box",
+                              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                              borderRadius: 4, cursor: isReadOnly ? "default" : "pointer",
+                              border: `1px solid ${
+                                activeCell?.h === h && activeCell?.pi === pi && activeCell?.type === "putts"
+                                  ? "#4a9bdb" : T.borderDim
+                              }`,
+                              background: activeCell?.h === h && activeCell?.pi === pi && activeCell?.type === "putts"
+                                ? "rgba(74,155,219,0.15)" : "transparent",
+                              userSelect: "none", opacity: isReadOnly ? 0.8 : 1,
+                            }}
+                          >
+                            <span style={{ fontSize: 6, color: "#4a9bdb", lineHeight: 1 }}>P</span>
+                            <span style={{
+                              fontSize: 13, fontWeight: "bold", lineHeight: 1, marginTop: 1,
+                              color: putts[h][pi] ? "#4a9bdb" : T.borderDim,
+                            }}>{putts[h][pi] || "·"}</span>
+                          </div>
                           {displayOpts.olympic && (() => {
                             const olPt = calcOlympicHolePts(olympicMedals[h], n)[pi];
                             return (
@@ -2431,24 +2475,31 @@ export default function App() {
       {activeCell && !isReadOnly && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: T.bgCard, borderTop: `2px solid ${GOLD}`,
-          padding: "8px 12px 12px", zIndex: 300,
-          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6,
+          background: T.bgCard, borderTop: `2px solid ${activeCell.type === "putts" ? "#4a9bdb" : GOLD}`,
+          padding: "4px 12px 12px", zIndex: 300,
           maxWidth: 520, margin: "0 auto",
         }}>
-          {["1","2","3","4","5","6","7","8","9","✕","0","⌫"].map(key => (
-            <button
-              key={key}
-              onPointerDown={e => { e.preventDefault(); if (key === "✕") { setActiveCell(null); } else { handleNumpad(key); } }}
-              style={{
-                padding: "14px 0", borderRadius: 8, fontSize: 20, fontWeight: "bold",
-                cursor: "pointer", userSelect: "none",
-                background: key === "✕" ? "#1a0a0a" : T.bg,
-                border: `1px solid ${key === "✕" ? RED : T.border}`,
-                color: key === "✕" ? RED : key === "⌫" ? GOLD : T.text,
-              }}
-            >{key}</button>
-          ))}
+          <div style={{
+            textAlign: "center", fontSize: 9, letterSpacing: 2, marginBottom: 4,
+            color: activeCell.type === "putts" ? "#4a9bdb" : GOLD,
+          }}>
+            {activeCell.type === "putts" ? "PUTT" : "SCORE"} — {names[activeCell.pi]}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {["1","2","3","4","5","6","7","8","9","✕","0","⌫"].map(key => (
+              <button
+                key={key}
+                onPointerDown={e => { e.preventDefault(); if (key === "✕") { setActiveCell(null); } else { handleNumpad(key); } }}
+                style={{
+                  padding: "14px 0", borderRadius: 8, fontSize: 20, fontWeight: "bold",
+                  cursor: "pointer", userSelect: "none",
+                  background: key === "✕" ? "#1a0a0a" : T.bg,
+                  border: `1px solid ${key === "✕" ? RED : T.border}`,
+                  color: key === "✕" ? RED : key === "⌫" ? (activeCell.type === "putts" ? "#4a9bdb" : GOLD) : T.text,
+                }}
+              >{key}</button>
+            ))}
+          </div>
         </div>
       )}
     </div>
