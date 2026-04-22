@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { getDeviceId } from "../lib/session";
 
 export interface SessionSummary {
   id: string;
@@ -11,16 +10,16 @@ export interface SessionSummary {
   mode: number;
 }
 
-export function useSession() {
+export function useSession(userId: string | undefined) {
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<SessionSummary[]>([]);
 
   async function fetchHistory() {
-    const deviceId = getDeviceId();
+    if (!userId) return;
     const { data } = await supabase
       .from("sessions")
       .select("id, course_name, updated_at, names, totals, mode")
-      .eq("device_id", deviceId)
+      .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(30);
     setHistoryList((data ?? []) as SessionSummary[]);

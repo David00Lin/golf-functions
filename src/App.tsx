@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import type { Opts, Group, LeaderboardEntry } from "./types";
 import { useSession } from "./hooks/useSession";
 import { supabase } from "./lib/supabase";
-import { getSessionId, getDeviceId, newSession } from "./lib/session";
+import { getSessionId, newSession } from "./lib/session";
+import { useAuth } from "./hooks/useAuth";
 import { i18n, getLangFromPath, type Lang, type I18nKey } from "./i18n";
 
 const HOLES = 18;
@@ -227,7 +228,7 @@ export default function App() {
   const isReadOnly = isViewing || isSharedView;
   const isSettingsLocked = isParticipant || isReadOnly; // オーナー以外は設定変更不可
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [adminSessionList, setAdminSessionList] = useState<{ id: string; course_name: string | null; mode: number; updated_at: string; names: string[]; device_id: string }[]>([]);
+  const [adminSessionList, setAdminSessionList] = useState<{ id: string; course_name: string | null; mode: number; updated_at: string; names: string[]; user_id: string }[]>([]);
   // 参加者・閲覧者・管理者はオプション・チーム分けをローカルのみ変更可（DB非反映）
   const displayOpts = (isParticipant || isSharedView || isAdminMode) && localOpts !== null ? localOpts : opts;
   const displayTeamMode = (isParticipant || isSharedView || isAdminMode) && localTeamMode !== null ? localTeamMode : teamMode;
@@ -235,7 +236,7 @@ export default function App() {
   const [playerTokenExpiresAt, setPlayerTokenExpiresAt] = useState<(string | null)[]>([null, null, null, null]);
   const [viewCode, setViewCode] = useState<string | null>(null);
   const [shareInput, setShareInput] = useState("");
-  const [accessLogs, setAccessLogs] = useState<{ device_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
+  const [accessLogs, setAccessLogs] = useState<{ user_id: string; ip_address: string | null; accessed_at: string; role: string }[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupList, setGroupList] = useState<Group[]>([]);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
@@ -250,7 +251,10 @@ export default function App() {
   const [lvMode, setLvMode] = useState(true);
   const t = (key: I18nKey) => i18n[lang][key];
 
-  const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession();
+  const { user, loading: authLoading, isAnonymous, linkWithGoogle, signOut } = useAuth();
+  const userId = user?.id;
+
+  const { showHistory, toggleHistory, setShowHistory, historyList, fetchHistory } = useSession(userId);
 
   // コース名サジェスト検索（300ms debounce）
   useEffect(() => {
@@ -323,39 +327,44 @@ export default function App() {
     if (backLabel)  { tryAutofillPars(backLabel, 9);  tryAutofillSI(backLabel, 9); }
   }, [courseNameValid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // サイトアクセスログ記録 + 訪問者カウント更新（初回マウント時のみ）
+  // サイトアクセスログ記録 + 訪問者カウント更新（userId 確定後に一度だけ実行）
   useEffect(() => {
+    if (!userId) return;
     const params = new URLSearchParams(window.location.search);
     const urlParams = params.toString() || null;
-    const deviceId = getDeviceId();
     fetch("https://api.ipify.org?format=json").catch(() => null)
       .then(r => r ? r.json() : { ip: null })
       .then(async ({ ip }) => {
         const { error: logErr } = await supabase.from("site_access_logs").insert({
-          device_id: deviceId,
+          user_id: userId,
           ip_address: ip,
           user_agent: navigator.userAgent,
           url_params: urlParams,
         });
         if (logErr) console.error("[site_access_logs]", logErr);
-        // 訪問者サマリー更新（デバイス × IP の新規 or カウント+1）
-        const { error: visitErr } = await supabase.rpc("record_site_visit", { p_device_id: deviceId, p_ip: ip });
-        if (visitErr) console.error("[record_site_visit]", visitErr);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 初回アクセス時にユーザー名を確認・未登録なら登録モーダルを表示
+  const profileCheckedRef = useRef<string | null>(null);
+  // userId 確定後にユーザー名を確認・未登録なら登録モーダルを表示
   useEffect(() => {
-    supabase.from("device_profiles").select("display_name")
-      .eq("device_id", getDeviceId()).maybeSingle()
+    if (!userId) return;
+    if (profileCheckedRef.current === userId) return;
+    profileCheckedRef.current = userId;
+    const googleName = user?.user_metadata?.full_name as string | undefined;
+    supabase.from("user_profiles").select("display_name")
+      .eq("user_id", userId).maybeSingle()
       .then(({ data }) => {
         if (data) {
           setDisplayName(data.display_name);
+        } else if (googleName) {
+          supabase.from("user_profiles").upsert({ user_id: userId, display_name: googleName });
+          setDisplayName(googleName);
         } else {
           setShowNameRegistration(true);
         }
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // セッション復元（URLパラメータ ?c= によるコード参加を含む）
   useEffect(() => {
@@ -417,7 +426,7 @@ export default function App() {
     }
 
     const id = getSessionId();
-    supabase.from("sessions").select("*").eq("id", id).single()
+    supabase.from("sessions").select("*").eq("id", id).maybeSingle()
       .then(({ data }) => {
         if (!data) return;
         setMode(data.mode as 3 | 4);
@@ -524,20 +533,20 @@ export default function App() {
   useEffect(() => {
     if (isSharedView || isParticipant) return;
     const targetId = viewingSessionId ?? sessionId;
-    supabase.from("share_access_logs").select("device_id, ip_address, accessed_at, role")
+    supabase.from("share_access_logs").select("user_id, ip_address, accessed_at, role")
       .eq("session_id", targetId).order("accessed_at", { ascending: false })
       .then(({ data }) => { setAccessLogs(data ?? []); });
   }, [sessionId, viewingSessionId, isSharedView, isParticipant]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // オーナー用：グループ一覧取得（初回マウント時のみ）
+  // オーナー用：グループ一覧取得（userId 確定後に実行）
   useEffect(() => {
-    if (isSharedView || isParticipant) return;
+    if (isSharedView || isParticipant || !userId) return;
     supabase.from("groups")
       .select("id, name, member_names, mode")
-      .eq("owner_device_id", getDeviceId())
+      .eq("owner_user_id", userId)
       .order("updated_at", { ascending: false })
       .then(({ data }) => { setGroupList((data ?? []) as Group[]); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // names[] がグループのメンバー構成と完全一致したら自動でグループを選択
   useEffect(() => {
@@ -633,7 +642,7 @@ export default function App() {
       return;
     }
     const { data, error } = await supabase.from("groups").insert({
-      owner_device_id: getDeviceId(),
+      owner_user_id: userId,
       name: groupName,
       member_names: names.slice(0, n),
       mode: n,
@@ -656,8 +665,8 @@ export default function App() {
 
   // 初回名前登録
   async function registerDisplayName(name: string) {
-    const { error } = await supabase.from("device_profiles").upsert({
-      device_id: getDeviceId(),
+    const { error } = await supabase.from("user_profiles").upsert({
+      user_id: userId,
       display_name: name,
     });
     if (error) {
@@ -1033,7 +1042,6 @@ export default function App() {
   const canSave = !isViewing &&
     courseNameValid &&
     names.slice(0, n).every(name => name.trim() !== "" && !/^Player\d+$/.test(name.trim())) &&
-    !pars.every(v => v === 4) &&
     filledHoles >= 3;
 
   // 保存済みスナップショット（一致 = 保存済み = ポップアップ不要）
@@ -1109,7 +1117,7 @@ export default function App() {
     if (rawInput.toLowerCase() === "wanida") {
       const { data } = await supabase
         .from("sessions")
-        .select("id, course_name, mode, updated_at, names, device_id")
+        .select("id, course_name, mode, updated_at, names, user_id")
         .order("updated_at", { ascending: false })
         .limit(500);
       setAdminSessionList(data ?? []);
@@ -1177,7 +1185,7 @@ export default function App() {
         session_id: tokenData.session_id,
         token,
         role: tokenData.role,
-        device_id: getDeviceId(),
+        user_id: userId,
         ip_address: ip,
       });
     } catch (_) { /* best-effort */ }
@@ -1189,16 +1197,19 @@ export default function App() {
   }
 
   async function saveSession() {
-    if (!canSave || saving) return;
+    if (!canSave || saving || !userId) return;
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    console.log("[saveSession] session:", currentSession?.user?.id, "userId:", userId);
+    if (!currentSession) return;
     setSaving(true);
     // canonical opts/teamMode で totals を再計算（参加者の localOpts 汚染を排除）
     const canonicalTotals = computeCanonicalTotals(scores, pars, opts, teamMode, mode, pushCounts, handicaps, strokeIndexes);
     // olympic totals（opts.olympic が正規の判定基準）
     const olTotals = opts.olympic ? olympicTotals : Array(n).fill(0);
-    await supabase.from("sessions").upsert({
+    const { error: saveErr } = await supabase.from("sessions").upsert({
       id: getSessionId(),
-      device_id: getDeviceId(),             // トリガーにより UPDATE 時は上書き不可
-      last_editor_device_id: getDeviceId(), // 最終編集者を別途記録
+      user_id: userId,
+      last_editor_user_id: userId,
       updated_at: new Date().toISOString(),
       mode: n,
       team_mode: teamMode,
@@ -1219,6 +1230,8 @@ export default function App() {
       lv_mode: lvMode,
       putts,
     });
+    if (saveErr) console.error("[saveSession] error:", saveErr);
+    else console.log("[saveSession] success, userId:", userId);
     setSavedSnapshot(currentSnapshot);
     setSaving(false);
 
@@ -1234,17 +1247,16 @@ export default function App() {
           course = res.data;
         }
         if (course) {
-          const deviceId = getDeviceId();
           const isAllFour = (p: number[]) => p.every(v => v === 4);
           const submissions = [];
           const frontPars = pars.slice(0, 9);
           const backPars  = pars.slice(9, 18);
           const frontSI = strokeIndexes.slice(0, 9);
           const backSI  = strokeIndexes.slice(9, 18);
-          if (frontLabel && !isAllFour(frontPars)) submissions.push({ course_id: course.id, label: frontLabel, pars: frontPars, stroke_indexes: frontSI, device_id: deviceId });
-          if (backLabel  && !isAllFour(backPars))  submissions.push({ course_id: course.id, label: backLabel,  pars: backPars,  stroke_indexes: backSI,  device_id: deviceId });
+          if (frontLabel && !isAllFour(frontPars)) submissions.push({ course_id: course.id, label: frontLabel, pars: frontPars, stroke_indexes: frontSI, user_id: userId });
+          if (backLabel  && !isAllFour(backPars))  submissions.push({ course_id: course.id, label: backLabel,  pars: backPars,  stroke_indexes: backSI,  user_id: userId });
           for (const s of submissions) {
-            await supabase.from("course_sections").upsert(s, { onConflict: "course_id,label,device_id" });
+            await supabase.from("course_sections").upsert(s, { onConflict: "course_id,label,user_id" });
           }
         }
       } catch (_) { /* best-effort */ }
@@ -1280,6 +1292,14 @@ export default function App() {
   };
   const cell: React.CSSProperties = { borderLeft: `1px solid ${T.borderDim}`, padding: "4px 3px" };
 
+  if (authLoading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#1a2e1a" }}>
+        <div style={{ color: GOLD, fontSize: 12, letterSpacing: 3 }}>LOADING...</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'Georgia', serif", color: T.text }}>
       {/* Header */}
@@ -1311,20 +1331,39 @@ export default function App() {
             }} />
           </div>
         </div>
-        <button onClick={() => { window.location.href = lang === "ja" ? "/zh/index.html" : "/index.html"; }} style={{
-          position: "absolute", top: 14, right: 44,
-          background: lang === "zh" ? "#2a1f00" : "transparent",
-          border: `1px solid ${lang === "zh" ? GOLD : T.border}`,
-          borderRadius: 6, color: lang === "zh" ? GOLD : T.textDim,
-          fontSize: 11, cursor: "pointer", padding: "2px 6px",
-        }}>{lang === "zh" ? "日本語" : "繁"}</button>
-        {/* ハンバーガーメニュー */}
-        <button style={{
-          position: "absolute", top: 14, right: 12,
-          background: "transparent", border: "none",
-          color: GOLD, fontSize: 20, cursor: "pointer",
-          lineHeight: 1, padding: "2px 4px",
-        }}>☰</button>
+        <div style={{ position: "absolute", top: 14, right: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => { window.location.href = lang === "ja" ? "/zh/index.html" : "/index.html"; }} style={{
+            background: lang === "zh" ? "#2a1f00" : "transparent",
+            border: `1px solid ${lang === "zh" ? GOLD : T.border}`,
+            borderRadius: 6, color: lang === "zh" ? GOLD : T.textDim,
+            fontSize: 11, cursor: "pointer", padding: "2px 6px",
+          }}>{lang === "zh" ? "日本語" : "繁"}</button>
+          {/* 認証ボタン */}
+          {isAnonymous ? (
+            <button
+              onClick={linkWithGoogle}
+              style={{
+                padding: "2px 8px", borderRadius: 6, fontSize: 10,
+                border: `1px solid ${T.border}`,
+                background: "transparent", color: T.textDim, cursor: "pointer",
+              }}
+            >G ログイン</button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 9, color: T.textDim }}>
+                {(user?.user_metadata?.full_name as string) || displayName || user?.email}
+              </span>
+              <button
+                onClick={signOut}
+                style={{
+                  padding: "2px 6px", borderRadius: 6, fontSize: 9,
+                  border: `1px solid ${T.border}`,
+                  background: "transparent", color: T.textDim, cursor: "pointer",
+                }}
+              >ログアウト</button>
+            </div>
+          )}
+        </div>
         {/* セパレーター */}
         <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 10 }} />
         {/* コントロール行: 新ゲーム | セグメント人数切替 | 履歴 */}
@@ -1418,7 +1457,7 @@ export default function App() {
             </div>
           )}
           {isViewing && !isSharedView && accessLogs.length > 0 && (() => {
-            const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
+            const uniqueDevices = new Set(accessLogs.map(l => l.user_id)).size;
             const last = accessLogs[0];
             return (
               <div style={{ width: "100%", marginTop: 6, padding: "6px 12px", background: T.bgDark, borderRadius: 8, border: `1px solid ${T.borderDim}` }}>
@@ -1489,7 +1528,7 @@ export default function App() {
                 </div>
                 <div style={{ fontSize: 9, color: T.textDimmer }}>
                   {formatDate(s.updated_at)} · {s.mode}人 · ID: {s.id.slice(0, 8)}
-                  {isAdminMode && <span style={{ color: "#6a4a2a", marginLeft: 4 }}>device: {(s as any).device_id?.slice(0, 8)}</span>}
+                  {isAdminMode && <span style={{ color: "#6a4a2a", marginLeft: 4 }}>user: {(s as any).user_id?.slice(0, 8)}</span>}
                 </div>
               </div>
               <div style={{ fontSize: 9, color: T.textDim, flexShrink: 0 }}>
@@ -2355,7 +2394,7 @@ export default function App() {
               </div>
             )}
             {accessLogs.length > 0 && !isParticipant && !isSharedView && (() => {
-              const uniqueDevices = new Set(accessLogs.map(l => l.device_id)).size;
+              const uniqueDevices = new Set(accessLogs.map(l => l.user_id)).size;
               const last = accessLogs[0];
               return (
                 <div style={{ marginTop: 8, padding: "8px 12px", background: T.bgDark, borderRadius: 8, border: `1px solid ${T.borderDim}` }}>
@@ -2436,6 +2475,23 @@ export default function App() {
                 color: nameInput.trim() ? GOLD : T.textDim,
               }}
             >{t('confirm')}</button>
+            {isAnonymous && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.borderDim}` }}>
+                <div style={{ fontSize: 9, color: T.textDim, marginBottom: 6 }}>または</div>
+                <button
+                  onClick={() => { setShowNameRegistration(false); setNameInput(""); linkWithGoogle(); }}
+                  style={{
+                    width: "100%", padding: "9px 0", fontSize: 13,
+                    borderRadius: 8, cursor: "pointer",
+                    border: `1px solid ${T.border}`,
+                    background: T.bgDeep, color: T.textSub,
+                  }}
+                >Google アカウントでログイン</button>
+                <div style={{ fontSize: 8, color: T.textDimmer, marginTop: 4 }}>
+                  ※ データはデバイス間で同期されます
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
